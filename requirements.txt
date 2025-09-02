@@ -4,4 +4,3 @@ yfinance
 pandas
 plotly
 kaleido==0.2.1
-python-telegram-bot==13.15
