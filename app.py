@@ -196,8 +196,10 @@ def telegram_webhook():
                 added = []
                 for line in lines:
                     parts = line.strip().split()
-                    if len(parts) == 2:  # expects exactly 2 parts: Name Symbol
-                        name, symbol = parts
+                    if len(parts) >= 2:
+                        # Everything except last token = name, last token = symbol
+                        name = "_".join(parts[:-1])   # auto replace spaces with underscores
+                        symbol = parts[-1]
                         WATCHLIST[name] = symbol
                         added.append(f"{name} -> {symbol}")
                     else:
@@ -233,7 +235,6 @@ def telegram_webhook():
             except:
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /removewatch Name"})
         
-
 
     # --- Handle button presses ---
     if "callback_query" in data:
