@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
+pio.kaleido.scope.default_format = "png"
 
 from flask import Flask, request
 import requests
