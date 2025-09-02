@@ -103,6 +103,9 @@ def telegram_webhook():
         try:
             fig = plot_stock_chart(symbol, days)
             buf = io.BytesIO()
+            pio.kaleido.scope.default_format = "png"
+            pio.kaleido.scope.default_width = 1000
+            pio.kaleido.scope.default_height = 700
             fig.write_image(buf, format="png")
             buf.seek(0)
             requests.post(f"{TELEGRAM_API}/sendPhoto", data={"chat_id": chat_id}, files={"photo": buf})
