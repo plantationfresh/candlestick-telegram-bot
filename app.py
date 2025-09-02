@@ -11,11 +11,24 @@ pio.kaleido.scope.default_format = "png"
 from flask import Flask, request
 import requests
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 # --- Telegram Setup ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 app = Flask(__name__)
+
+# --- Watchlist ---
+WATCHLIST = {
+    "Reliance": "RELIANCE.NS",
+    "M&M": "M&M.NS",
+    "ARE&M": "ARE&M.NS",
+    "SMLISUZU": "SMLISUZU.NS",
+    "ASHOKLEY": "ASHOKLEY.NS",
+    "EICHER":"EICHERMOT.NS"
+}
+
 
 # --- RSI Calculation (same as yours) ---
 def calculate_rsi(series, period=14):
@@ -89,33 +102,62 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
 
     return fig
 
-# --- Telegram Webhook ---
+# --- Shared function to send chart ---
+def send_chart(chat_id, symbol, days=365):
+    try:
+        fig = plot_stock_chart(symbol, days)
+        buf = io.BytesIO()
+        fig.write_image(buf, format="png")
+        buf.seek(0)
+        requests.post(
+            f"{TELEGRAM_API}/sendPhoto",
+            data={"chat_id": chat_id},
+            files={"photo": buf}
+        )
+        buf.close()
+    except Exception as e:
+        requests.post(
+            f"{TELEGRAM_API}/sendMessage",
+            data={"chat_id": chat_id, "text": f"Error: {e}"}
+        )
+    return "ok"
+
+# --- Webhook handler ---
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def telegram_webhook():
     data = request.get_json()
-    chat_id = data["message"]["chat"]["id"]
-    text = data["message"].get("text", "")
 
-    if text.startswith("/chart"):
-        parts = text.split()
-        symbol = parts[1] if len(parts) > 1 else "AAPL"
-        days = int(parts[2]) if len(parts) > 2 else 365
+    # Handle messages
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
 
-        try:
-            fig = plot_stock_chart(symbol, days)
-            buf = io.BytesIO()
-            pio.kaleido.scope.default_format = "png"
-            pio.kaleido.scope.default_width = 1000
-            pio.kaleido.scope.default_height = 700
-            fig.write_image(buf, format="png")
-            buf.seek(0)
-            requests.post(f"{TELEGRAM_API}/sendPhoto", data={"chat_id": chat_id}, files={"photo": buf})
-            buf.close()
-        except Exception as e:
-            requests.post(f"{TELEGRAM_API}/sendMessage", data={"chat_id": chat_id, "text": f"Error: {e}"})
+        if text.startswith("/watchlist"):
+            keyboard = [
+                [InlineKeyboardButton(name, callback_data=symbol)]
+                for name, symbol in WATCHLIST.items()
+            ]
+            reply_markup = {"inline_keyboard": keyboard}
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                json={"chat_id": chat_id, "text": "📊 Select a stock:", "reply_markup": reply_markup}
+            )
+
+        elif text.startswith("/chart"):
+            parts = text.split()
+            symbol = parts[1] if len(parts) > 1 else "AAPL"
+            days = int(parts[2]) if len(parts) > 2 else 365
+            return send_chart(chat_id, symbol, days)
+
+    # Handle button presses
+    if "callback_query" in data:
+        query = data["callback_query"]
+        chat_id = query["message"]["chat"]["id"]
+        symbol = query["data"]
+        return send_chart(chat_id, symbol, 365)
 
     return "ok"
-
+    
 @app.route("/")
 def home():
     return "Bot is running!"
