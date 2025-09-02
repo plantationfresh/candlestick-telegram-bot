@@ -112,9 +112,14 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     fig.add_trace(go.Bar(x=ohlc["Date_str"], y=ohlc["Volume"],
                          marker_color="purple", opacity=0.5, name="Volume"), row=3,col=1)
 
-    fig.update_layout(title=f"{ticker_symbol} - Last {days} Days", template="plotly_white",
-                      height=1100, xaxis_rangeslider_visible=False,
-                      xaxis=dict(type="category"))
+    fig.update_layout(
+        title=f"{ticker_symbol} - Last {days} Days",
+        template="plotly_white",
+        width=1400,   # wider
+        height=700,   # shorter
+        xaxis_rangeslider_visible=False,
+        xaxis=dict(type="category")
+    )
 
     ymin = ohlc["Low"].min()*0.98
     ymax = ohlc["High"].max()*1.02
