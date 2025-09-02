@@ -10,7 +10,15 @@ import plotly.io as pio
 
 from flask import Flask, request
 import requests
-from telegram import InlineKeyboardButton
+
+class InlineKeyboardButton:
+    def __init__(self, text, callback_data=None):
+        self.text = text
+        self.callback_data = callback_data
+
+    def to_dict(self):
+        return {"text": self.text, "callback_data": self.callback_data}
+
 
 # --- Telegram Setup ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -151,10 +159,11 @@ def telegram_webhook():
 
         if text.startswith("/watchlist"):
             keyboard = [
-                [InlineKeyboardButton(name, callback_data=symbol)]
+                [InlineKeyboardButton(name, callback_data=symbol).to_dict()]
                 for name, symbol in WATCHLIST.items()
             ]
             reply_markup = {"inline_keyboard": keyboard}
+
             requests.post(
                 f"{TELEGRAM_API}/sendMessage",
                 json={"chat_id": chat_id, "text": "📊 Select a stock:", "reply_markup": reply_markup}
