@@ -1,17 +1,16 @@
 import os
 import io
+import json
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
-pio.kaleido.scope.default_format = "png"
 
 from flask import Flask, request
 import requests
-
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton
 
 # --- Telegram Setup ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -19,18 +18,32 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 app = Flask(__name__)
 
-# --- Watchlist ---
-WATCHLIST = {
+# --- Fix Kaleido (Plotly image export) ---
+pio.kaleido.scope.default_format = "png"
+
+WATCHLIST_FILE = "watchlist.json"
+
+# --- Load watchlist from file or create default ---
+def load_watchlist():
+    if os.path.exists(WATCHLIST_FILE):
+        with open(WATCHLIST_FILE, "r") as f:
+            return json.load(f)
+    return {
     "Reliance": "RELIANCE.NS",
     "M&M": "M&M.NS",
     "ARE&M": "ARE&M.NS",
     "SMLISUZU": "SMLISUZU.NS",
     "ASHOKLEY": "ASHOKLEY.NS",
     "EICHER":"EICHERMOT.NS"
-}
+    }
 
+def save_watchlist(watchlist):
+    with open(WATCHLIST_FILE, "w") as f:
+        json.dump(watchlist, f)
 
-# --- RSI Calculation (same as yours) ---
+WATCHLIST = load_watchlist()
+
+# --- RSI Calculation ---
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
@@ -39,7 +52,7 @@ def calculate_rsi(series, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-# --- Your function, unchanged except fig.show() removed ---
+# --- Chart Function ---
 def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     end_date = datetime.today() + timedelta(days=1)
     start_date = end_date - timedelta(days=days)
@@ -50,6 +63,9 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     ohlc = ohlc[ohlc["Date"] >= start_date].copy()
     ohlc["Date_str"] = ohlc["Date"].dt.strftime("%Y-%m-%d")
     ohlc["RSI"] = calculate_rsi(ohlc["Close"])
+
+    if ohlc.empty:
+        raise ValueError(f"No data returned for {ticker_symbol}. Try a different symbol or longer period.")
 
     last_row = ohlc.iloc[-1]
     pp = (last_row["High"] + last_row["Low"] + last_row["Close"]) / 3
@@ -102,7 +118,7 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
 
     return fig
 
-# --- Shared function to send chart ---
+# --- Send chart helper ---
 def send_chart(chat_id, symbol, days=365):
     try:
         fig = plot_stock_chart(symbol, days)
@@ -122,12 +138,13 @@ def send_chart(chat_id, symbol, days=365):
         )
     return "ok"
 
-# --- Webhook handler ---
+# --- Telegram webhook handler ---
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def telegram_webhook():
+    global WATCHLIST
     data = request.get_json()
 
-    # Handle messages
+    # --- Handle text messages ---
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
@@ -149,7 +166,28 @@ def telegram_webhook():
             days = int(parts[2]) if len(parts) > 2 else 365
             return send_chart(chat_id, symbol, days)
 
-    # Handle button presses
+        elif text.startswith("/addwatch"):
+            try:
+                _, name, symbol = text.split(maxsplit=2)
+                WATCHLIST[name] = symbol
+                save_watchlist(WATCHLIST)
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"✅ Added {name} -> {symbol} to watchlist"})
+            except:
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /addwatch Name SYMBOL"})
+
+        elif text.startswith("/removewatch"):
+            try:
+                _, name = text.split(maxsplit=1)
+                if name in WATCHLIST:
+                    del WATCHLIST[name]
+                    save_watchlist(WATCHLIST)
+                    requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"❌ Removed {name} from watchlist"})
+                else:
+                    requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"{name} not found in watchlist"})
+            except:
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /removewatch Name"})
+
+    # --- Handle button presses ---
     if "callback_query" in data:
         query = data["callback_query"]
         chat_id = query["message"]["chat"]["id"]
@@ -157,7 +195,7 @@ def telegram_webhook():
         return send_chart(chat_id, symbol, 365)
 
     return "ok"
-    
+
 @app.route("/")
 def home():
     return "Bot is running!"
