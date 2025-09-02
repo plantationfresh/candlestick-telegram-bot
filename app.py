@@ -201,7 +201,15 @@ def telegram_webhook():
             except:
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /removewatch Name"})
 
-       elif text.startswith("/bulkwatch"):
+      
+        
+            except Exception as e:
+                requests.post(
+                    f"{TELEGRAM_API}/sendMessage",
+                    json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
+                )
+
+        elif text.startswith("/bulkwatch"):
             try:
                 # Remove the command itself, split by newlines
                 lines = text.strip().split("\n")[1:]  # everything after /bulkwatch
@@ -226,13 +234,12 @@ def telegram_webhook():
                     f"{TELEGRAM_API}/sendMessage",
                     json={"chat_id": chat_id, "text": msg}
                 )
-        
-            except Exception as e:
-                requests.post(
-                    f"{TELEGRAM_API}/sendMessage",
-                    json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
-                )
 
+    except Exception as e:
+        requests.post(
+            f"{TELEGRAM_API}/sendMessage",
+            json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
+        )
 
 
     # --- Handle button presses ---
