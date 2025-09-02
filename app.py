@@ -189,26 +189,6 @@ def telegram_webhook():
             except:
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /addwatch Name SYMBOL"})
 
-        elif text.startswith("/removewatch"):
-            try:
-                _, name = text.split(maxsplit=1)
-                if name in WATCHLIST:
-                    del WATCHLIST[name]
-                    save_watchlist(WATCHLIST)
-                    requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"❌ Removed {name} from watchlist"})
-                else:
-                    requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"{name} not found in watchlist"})
-            except:
-                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /removewatch Name"})
-
-      
-        
-            except Exception as e:
-                requests.post(
-                    f"{TELEGRAM_API}/sendMessage",
-                    json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
-                )
-
         elif text.startswith("/bulkwatch"):
             try:
                 # Remove the command itself, split by newlines
@@ -229,17 +209,30 @@ def telegram_webhook():
                     msg = "✅ Bulk upload successful:\n" + "\n".join(added)
                 else:
                     msg = "⚠️ No valid entries found.\nFormat: NAME SYMBOL"
-                
+        
                 requests.post(
                     f"{TELEGRAM_API}/sendMessage",
                     json={"chat_id": chat_id, "text": msg}
                 )
+        
+            except Exception as e:
+                requests.post(
+                    f"{TELEGRAM_API}/sendMessage",
+                    json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
+                )
 
-    except Exception as e:
-        requests.post(
-            f"{TELEGRAM_API}/sendMessage",
-            json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
-        )
+        elif text.startswith("/removewatch"):
+            try:
+                _, name = text.split(maxsplit=1)
+                if name in WATCHLIST:
+                    del WATCHLIST[name]
+                    save_watchlist(WATCHLIST)
+                    requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"❌ Removed {name} from watchlist"})
+                else:
+                    requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"{name} not found in watchlist"})
+            except:
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /removewatch Name"})
+        
 
 
     # --- Handle button presses ---
