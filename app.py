@@ -201,7 +201,7 @@ def telegram_webhook():
         query = data["callback_query"]
         chat_id = query["message"]["chat"]["id"]
         symbol = query["data"]
-        return send_chart(chat_id, symbol, 365)
+        return send_chart(chat_id, symbol, 180)
 
     return "ok"
 
