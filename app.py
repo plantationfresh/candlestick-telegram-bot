@@ -201,28 +201,38 @@ def telegram_webhook():
             except:
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /removewatch Name"})
 
-    elif text.startswith("/bulkwatch"):
+       elif text.startswith("/bulkwatch"):
         try:
-            # Get everything after the command
-            lines = text.split("\n")[1:]  # skip the first line "/bulkwatch"
+            # Remove the command itself, split by newlines
+            lines = text.strip().split("\n")[1:]  # everything after /bulkwatch
             added = []
             for line in lines:
                 parts = line.strip().split()
-                if len(parts) >= 2:
-                    name = parts[0]
-                    symbol = parts[1]
+                if len(parts) == 2:  # expects exactly 2 parts: Name Symbol
+                    name, symbol = parts
                     WATCHLIST[name] = symbol
                     added.append(f"{name} -> {symbol}")
-            
+                else:
+                    print(f"Skipping invalid line: {line}")
+    
             save_watchlist(WATCHLIST)
+    
             if added:
                 msg = "✅ Bulk upload successful:\n" + "\n".join(added)
             else:
-                msg = "⚠️ No valid entries found. Use format:\nName SYMBOL"
+                msg = "⚠️ No valid entries found.\nFormat: NAME SYMBOL"
+            
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                json={"chat_id": chat_id, "text": msg}
+            )
     
-            requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": msg})
         except Exception as e:
-            requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"})
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
+            )
+
 
 
     # --- Handle button presses ---
