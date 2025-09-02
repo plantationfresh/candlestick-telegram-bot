@@ -3,4 +3,4 @@ requests
 yfinance
 pandas
 plotly
-kaleido
+kaleido==0.2.1
