@@ -47,7 +47,7 @@ def load_watchlist():
 
 def save_watchlist(watchlist):
     with open(WATCHLIST_FILE, "w") as f:
-        json.dump(watchlist, f)
+        json.dump(dict(sorted(watchlist.items())), f, indent=2)
 
 WATCHLIST = load_watchlist()
 
@@ -151,81 +151,96 @@ def send_chart(chat_id, symbol, days=365):
         )
     return "ok"
 
-# --- Telegram webhook handler ---
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def telegram_webhook():
+    """
+    Handles incoming Telegram updates.
+    Fixes duplicate-photo bug by:
+      1. Handling callback_query first and returning immediately.
+      2. Answering the callback query (avoids client-side loading spinner).
+      3. Only then handling plain messages (commands).
+    """
     global WATCHLIST
     data = request.get_json()
 
-    # --- Handle text messages ---
+    # 1) Handle inline button presses (callback_query) FIRST and return immediately.
+    if "callback_query" in data:
+        try:
+            query = data["callback_query"]
+            callback_id = query.get("id")
+            # Some callback queries include the message dict; get chat id reliably:
+            chat_id = query["message"]["chat"]["id"]
+            symbol = query.get("data")
+
+            # Answer the callback so the Telegram client stops the "loading" state.
+            # This is optional but recommended.
+            requests.post(
+                f"{TELEGRAM_API}/answerCallbackQuery",
+                json={"callback_query_id": callback_id}
+            )
+
+            # Send the chart (default days = 180)
+            return send_chart(chat_id, symbol, 180)
+        except Exception as e:
+            # If anything goes wrong here, tell the user and return
+            try:
+                requests.post(
+                    f"{TELEGRAM_API}/sendMessage",
+                    json={"chat_id": chat_id, "text": f"Error handling button press: {e}"}
+                )
+            except:
+                pass
+            return "ok"
+
+    # 2) Then handle normal message updates (commands)
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
 
+        # /watchlist - show inline keyboard (sorted)
         if text.startswith("/watchlist"):
             keyboard = [
                 [InlineKeyboardButton(name, callback_data=symbol).to_dict()]
-                for name, symbol in WATCHLIST.items()
+                for name, symbol in sorted(WATCHLIST.items())
             ]
             reply_markup = {"inline_keyboard": keyboard}
-
             requests.post(
                 f"{TELEGRAM_API}/sendMessage",
                 json={"chat_id": chat_id, "text": "📊 Select a stock:", "reply_markup": reply_markup}
             )
+            return "ok"
 
+        # /chart SYMBOL [days]
         elif text.startswith("/chart"):
             parts = text.split()
             symbol = parts[1] if len(parts) > 1 else "AAPL"
-            days = int(parts[2]) if len(parts) > 2 else 180
+            try:
+                days = int(parts[2]) if len(parts) > 2 else 180
+            except:
+                days = 180
             return send_chart(chat_id, symbol, days)
 
+        # /addwatch Name SYMBOL
         elif text.startswith("/addwatch"):
             try:
-                _, name, symbol = text.split(maxsplit=2)
+                # allow names with spaces; last token is symbol
+                parts = text.split()
+                if len(parts) < 3:
+                    raise ValueError("Usage: /addwatch Name SYMBOL")
+                name = "_".join(parts[1:-1])
+                symbol = parts[-1]
                 WATCHLIST[name] = symbol
                 save_watchlist(WATCHLIST)
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"✅ Added {name} -> {symbol} to watchlist"})
-            except:
-                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /addwatch Name SYMBOL"})
-
-        elif text.startswith("/bulkwatch"):
-            try:
-                # Remove the command itself, split by newlines
-                lines = text.strip().split("\n")[1:]  # everything after /bulkwatch
-                added = []
-                for line in lines:
-                    parts = line.strip().split()
-                    if len(parts) >= 2:
-                        # Everything except last token = name, last token = symbol
-                        name = "_".join(parts[:-1])   # auto replace spaces with underscores
-                        symbol = parts[-1]
-                        WATCHLIST[name] = symbol
-                        added.append(f"{name} -> {symbol}")
-                    else:
-                        print(f"Skipping invalid line: {line}")
-        
-                save_watchlist(WATCHLIST)
-        
-                if added:
-                    msg = "✅ Bulk upload successful:\n" + "\n".join(added)
-                else:
-                    msg = "⚠️ No valid entries found.\nFormat: NAME SYMBOL"
-        
-                requests.post(
-                    f"{TELEGRAM_API}/sendMessage",
-                    json={"chat_id": chat_id, "text": msg}
-                )
-        
             except Exception as e:
-                requests.post(
-                    f"{TELEGRAM_API}/sendMessage",
-                    json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"}
-                )
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"Usage: /addwatch Name SYMBOL\nError: {e}"})
+            return "ok"
 
+        # /removewatch Name
         elif text.startswith("/removewatch"):
             try:
                 _, name = text.split(maxsplit=1)
+                name = name.replace(" ", "_")
                 if name in WATCHLIST:
                     del WATCHLIST[name]
                     save_watchlist(WATCHLIST)
@@ -234,16 +249,48 @@ def telegram_webhook():
                     requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"{name} not found in watchlist"})
             except:
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": "Usage: /removewatch Name"})
-        
+            return "ok"
 
-    # --- Handle button presses ---
-    if "callback_query" in data:
-        query = data["callback_query"]
-        chat_id = query["message"]["chat"]["id"]
-        symbol = query["data"]
-        return send_chart(chat_id, symbol, 180)
+        # /bulkwatch multi-line
+        elif text.startswith("/bulkwatch"):
+            try:
+                lines = text.strip().split("\n")[1:]  # everything after /bulkwatch
+                added = []
+                for line in lines:
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        # name can be multiple words -> join them with underscores
+                        name = "_".join(parts[:-1])
+                        symbol = parts[-1]
+                        WATCHLIST[name] = symbol
+                        added.append(f"{name} -> {symbol}")
+                    else:
+                        print(f"Skipping invalid line: {line}")
 
+                save_watchlist(WATCHLIST)
+
+                if added:
+                    msg = "✅ Bulk upload successful:\n" + "\n".join(added)
+                else:
+                    msg = "⚠️ No valid entries found.\nFormat: NAME SYMBOL"
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": msg})
+            except Exception as e:
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"})
+            return "ok"
+
+        # /mywatchlist - show plain text list (sorted)
+        elif text.startswith("/mywatchlist"):
+            try:
+                items = [f"{name} -> {symbol}" for name, symbol in sorted(WATCHLIST.items())]
+                text_out = "📋 Watchlist:\n" + "\n".join(items) if items else "Watchlist is empty."
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": text_out})
+            except Exception as e:
+                requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"Error: {e}"})
+            return "ok"
+
+    # Default return
     return "ok"
+
 
 @app.route("/")
 def home():
