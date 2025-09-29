@@ -8,6 +8,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
 
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.utils import ImageReader
 import threading
 import time
 
@@ -92,6 +95,82 @@ def send_all_charts(chat_id, days=180):
     # done
     requests.post(f"{TELEGRAM_API}/sendMessage",
                   json={"chat_id": chat_id, "text": f"✅ Done. Sent {sent}/{total} charts."})
+
+def send_chart_pdf(chat_id, days=180):
+    """
+    Generate charts for the entire watchlist and send a single PDF.
+    Runs in a background thread (caller should spawn it).
+    """
+    items = list(sorted(WATCHLIST.items()))  # [(name, symbol), ...]
+    if not items:
+        requests.post(f"{TELEGRAM_API}/sendMessage",
+                      json={"chat_id": chat_id, "text": "Watchlist is empty."})
+        return
+
+    # Let user know we started
+    requests.post(f"{TELEGRAM_API}/sendMessage",
+                  json={"chat_id": chat_id, "text": f"📄 Building PDF for {len(items)} charts (last {days} days)..."} )
+
+    # Prepare a PDF in memory
+    pdf_buf = io.BytesIO()
+    page_size = landscape(A4)  # (width, height)
+    c = canvas.Canvas(pdf_buf, pagesize=page_size)
+    pw, ph = page_size
+
+    count = 0
+    for name, symbol in items:
+        try:
+            fig = plot_stock_chart(symbol, days)
+            img_buf = io.BytesIO()
+            # plotly->PNG in memory
+            fig.write_image(img_buf, format="png")
+            img_buf.seek(0)
+
+            # Fit image onto page preserving aspect ratio with margins
+            margin = 24
+            max_w = pw - 2*margin
+            max_h = ph - 2*margin
+
+            image = ImageReader(img_buf)
+            iw, ih = image.getSize()
+            scale = min(max_w/iw, max_h/ih)
+            draw_w, draw_h = iw*scale, ih*scale
+            x = (pw - draw_w) / 2
+            y = (ph - draw_h) / 2
+
+            # Optional header text (small)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(margin, ph - margin + 4, f"{name} ({symbol}) • {days}d")
+
+            # Draw image
+            c.drawImage(image, x, y, width=draw_w, height=draw_h)
+
+            c.showPage()
+            img_buf.close()
+            count += 1
+
+            # Gentle pacing in case of large lists
+            time.sleep(0.2)
+
+        except Exception as e:
+            # Add a page with the error, but keep going
+            c.setFont("Helvetica", 12)
+            c.drawString(40, ph - 60, f"{name} ({symbol})")
+            c.setFont("Helvetica-Oblique", 10)
+            c.drawString(40, ph - 80, f"Error: {e}")
+            c.showPage()
+
+    c.save()
+    pdf_buf.seek(0)
+
+    # Send the PDF
+    files = {
+        "document": ("watchlist_charts.pdf", pdf_buf, "application/pdf")
+    }
+    requests.post(f"{TELEGRAM_API}/sendDocument",
+                  data={"chat_id": chat_id, "caption": f"✅ {count}/{len(items)} charts • {days}d"},
+                  files=files)
+    pdf_buf.close()
 
 
 # --- RSI Calculation ---
@@ -309,6 +388,23 @@ def telegram_webhook():
             requests.post(
                 f"{TELEGRAM_API}/sendMessage",
                 json={"chat_id": chat_id, "text": "📊 Select a stock:", "reply_markup": reply_markup}
+            )
+            return "ok"
+
+        elif text.split()[0] == "/chartpdf":
+            try:
+                parts = text.split()
+                days = int(parts[1]) if len(parts) > 1 else 180
+            except:
+                days = 180
+        
+            # Run in background so webhook returns immediately
+            threading.Thread(target=send_chart_pdf, args=(chat_id, days), daemon=True).start()
+        
+            # Quick ack to avoid Telegram retries
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                json={"chat_id": chat_id, "text": f"🕒 Generating PDF for all watchlist charts (last {days} days)..."}
             )
             return "ok"
 
