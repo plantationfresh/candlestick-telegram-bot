@@ -8,6 +8,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
 
+import threading
+import time
+
 from flask import Flask, request
 import requests
 
@@ -50,6 +53,46 @@ def save_watchlist(watchlist):
         json.dump(dict(sorted(watchlist.items())), f, indent=2)
 
 WATCHLIST = load_watchlist()
+
+def send_all_charts(chat_id, days=180):
+    """Generate and send charts for every watchlist item, sequentially."""
+    items = list(sorted(WATCHLIST.items()))  # [(name, symbol), ...]
+    total = len(items)
+    if total == 0:
+        requests.post(f"{TELEGRAM_API}/sendMessage",
+                      json={"chat_id": chat_id, "text": "Watchlist is empty."})
+        return
+
+    # announce start
+    requests.post(f"{TELEGRAM_API}/sendMessage",
+                  json={"chat_id": chat_id, "text": f"📈 Starting {total} charts (last {days} days)..."})
+
+    sent = 0
+    for name, symbol in items:
+        try:
+            fig = plot_stock_chart(symbol, days)
+            buf = io.BytesIO()
+            # if you set width/height in update_layout, no need to pass here
+            fig.write_image(buf, format="png")
+            buf.seek(0)
+
+            caption = f"{name} ({symbol}) • {days}d"
+            requests.post(f"{TELEGRAM_API}/sendPhoto",
+                          data={"chat_id": chat_id, "caption": caption},
+                          files={"photo": buf})
+            buf.close()
+            sent += 1
+
+            # polite pacing to avoid Telegram/YF rate limits
+            time.sleep(0.8)
+        except Exception as e:
+            requests.post(f"{TELEGRAM_API}/sendMessage",
+                          json={"chat_id": chat_id, "text": f"⚠️ {name} ({symbol}): {e}"})
+
+    # done
+    requests.post(f"{TELEGRAM_API}/sendMessage",
+                  json={"chat_id": chat_id, "text": f"✅ Done. Sent {sent}/{total} charts."})
+
 
 # --- RSI Calculation ---
 def calculate_rsi(series, period=14):
@@ -111,6 +154,65 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
 
     fig.add_trace(go.Bar(x=ohlc["Date_str"], y=ohlc["Volume"],
                          marker_color="purple", opacity=0.5, name="Volume"), row=3,col=1)
+
+    # --- Pivot & S/R lines on the price chart (Row 1) ---
+    fig.add_hline(
+        y=pp,
+        line=dict(color="black", width=1, dash="dot"),
+        annotation_text=f"PP {pp:.2f}",
+        annotation_position="top left",
+        row=1, col=1
+    )
+
+    fig.add_hline(
+        y=r1,
+        line=dict(color="red", width=1, dash="dash"),
+        annotation_text=f"R1 {r1:.2f}",
+        annotation_position="top left",
+        row=1, col=1
+    )
+
+    fig.add_hline(
+        y=r2,
+        line=dict(color="red", width=1, dash="dashdot"),
+        annotation_text=f"R2 {r2:.2f}",
+        annotation_position="top left",
+        row=1, col=1
+    )
+
+    fig.add_hline(
+        y=s1,
+        line=dict(color="green", width=1, dash="dash"),
+        annotation_text=f"S1 {s1:.2f}",
+        annotation_position="bottom left",
+        row=1, col=1
+    )
+
+    fig.add_hline(
+        y=s2,
+        line=dict(color="green", width=1, dash="dashdot"),
+        annotation_text=f"S2 {s2:.2f}",
+        annotation_position="bottom left",
+        row=1, col=1
+    )
+    # --- Compact info box with latest levels ---
+    levels_text = (
+        f"<b>{ticker_symbol} Levels</b><br>"
+        f"PP: {pp:.2f}<br>"
+        f"R1: {r1:.2f} &nbsp; R2: {r2:.2f}<br>"
+        f"S1: {s1:.2f} &nbsp; S2: {s2:.2f}"
+    )
+
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.01, y=0.98,
+        showarrow=False,
+        align="left",
+        bordercolor="rgba(0,0,0,0.15)",
+        borderwidth=1,
+        bgcolor="rgba(255,255,255,0.7)",
+        text=levels_text
+    )
 
     fig.update_layout(
         title=f"{ticker_symbol} - Last {days} Days",
@@ -286,6 +388,23 @@ def telegram_webhook():
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": text_out})
             except Exception as e:
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"Error: {e}"})
+            return "ok"
+
+        elif text.startswith("/chartall"):
+            try:
+                parts = text.split()
+                days = int(parts[1]) if len(parts) > 1 else 180
+            except:
+                days = 180
+        
+            # run in background so webhook returns fast
+            threading.Thread(target=send_all_charts, args=(chat_id, days), daemon=True).start()
+        
+            # quick ack so Telegram doesn’t retry
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                json={"chat_id": chat_id, "text": f"🕒 Generating charts for all watchlist symbols (last {days} days)..."}
+            )
             return "ok"
 
     # Default return
