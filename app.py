@@ -313,7 +313,7 @@ def telegram_webhook():
             return "ok"
 
         # /chart SYMBOL [days]
-        elif text.startswith("/chart"):
+        elif text.split()[0] == "/chart":
             parts = text.split()
             symbol = parts[1] if len(parts) > 1 else "AAPL"
             try:
