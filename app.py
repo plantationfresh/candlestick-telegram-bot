@@ -238,7 +238,7 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     fig.add_hline(
         y=pp,
         line=dict(color="black", width=1, dash="dot"),
-        annotation_text=f"PP {pp:.2f}",
+        #annotation_text=f"PP {pp:.2f}",
         annotation_position="top left",
         row=1, col=1
     )
@@ -246,7 +246,7 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     fig.add_hline(
         y=r1,
         line=dict(color="red", width=1, dash="dash"),
-        annotation_text=f"R1 {r1:.2f}",
+        #annotation_text=f"R1 {r1:.2f}",
         annotation_position="top left",
         row=1, col=1
     )
@@ -254,7 +254,7 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     fig.add_hline(
         y=r2,
         line=dict(color="red", width=1, dash="dashdot"),
-        annotation_text=f"R2 {r2:.2f}",
+        #annotation_text=f"R2 {r2:.2f}",
         annotation_position="top left",
         row=1, col=1
     )
@@ -262,7 +262,7 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     fig.add_hline(
         y=s1,
         line=dict(color="green", width=1, dash="dash"),
-        annotation_text=f"S1 {s1:.2f}",
+        #annotation_text=f"S1 {s1:.2f}",
         annotation_position="bottom left",
         row=1, col=1
     )
@@ -270,7 +270,7 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     fig.add_hline(
         y=s2,
         line=dict(color="green", width=1, dash="dashdot"),
-        annotation_text=f"S2 {s2:.2f}",
+        #annotation_text=f"S2 {s2:.2f}",
         annotation_position="bottom left",
         row=1, col=1
     )
