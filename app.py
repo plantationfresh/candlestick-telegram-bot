@@ -184,6 +184,7 @@ def calculate_rsi(series, period=14):
 
 # --- Chart Function ---
 def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
+    internal_days = max(days, 220)
     end_date = datetime.today() + timedelta(days=1)
     start_date = end_date - timedelta(days=days)
 
@@ -214,6 +215,9 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     ohlc["Donchian_Upper"] = ohlc["High"].rolling(window=donchian_window).max()
     ohlc["Donchian_Lower"] = ohlc["Low"].rolling(window=donchian_window).min()
     ohlc["Donchian_Middle"] = (ohlc["Donchian_Upper"] + ohlc["Donchian_Lower"]) / 2
+
+    if len(ohlc) > days:
+        ohlc = ohlc.iloc[-days:].copy()
 
     # --- Create Subplots (4 rows: Price, RSI, Volume, MAs) ---
 
