@@ -184,28 +184,45 @@ def calculate_rsi(series, period=14):
 
 # --- Chart Function ---
 def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
-    buffer_days = 260  # ~1 trading year ≈ 252 sessions; add a cushion
+    # --- Fetch OHLC Data with extra buffer so SMA200 is available ---
+    buffer_days = 260  # ~1 trading year cushion
     internal_days = max(days + buffer_days, 420)
+
     end_date = datetime.today() + timedelta(days=1)
     start_date = end_date - timedelta(days=internal_days)
 
     ticker = yf.Ticker(ticker_symbol)
     ohlc = ticker.history(start=start_date, end=end_date, interval="1d").reset_index()
     ohlc["Date"] = pd.to_datetime(ohlc["Date"]).dt.tz_localize(None)
+
+    # Keep only valid rows
     ohlc = ohlc[ohlc["Date"] >= start_date].copy()
-    ohlc["Date_str"] = ohlc["Date"].dt.strftime("%Y-%m-%d")
+
+    # Indicators (compute on full internal window)
     ohlc["RSI"] = calculate_rsi(ohlc["Close"])
 
-    # --- Moving Averages ---
+    # Moving Averages
     ohlc["SMA20"]  = ohlc["Close"].rolling(window=20).mean()
     ohlc["SMA50"]  = ohlc["Close"].rolling(window=50).mean()
     ohlc["SMA200"] = ohlc["Close"].rolling(window=200).mean()
+    # Last-resort fallback so something draws even if data is very short
+    if ohlc["SMA200"].notna().sum() == 0:
+        ohlc["SMA200"] = ohlc["Close"].rolling(window=200, min_periods=1).mean()
 
+    # Donchian Channels
+    ohlc["Donchian_Upper"]  = ohlc["High"].rolling(window=donchian_window).max()
+    ohlc["Donchian_Lower"]  = ohlc["Low"].rolling(window=donchian_window).min()
+    ohlc["Donchian_Middle"] = (ohlc["Donchian_Upper"] + ohlc["Donchian_Lower"]) / 2
 
-    if ohlc.empty:
-        raise ValueError(f"No data returned for {ticker_symbol}. Try a different symbol or longer period.")
+    # Slice to last `days` **calendar** days for DISPLAY
+    view_start = end_date - timedelta(days=days)
+    ohlc_view = ohlc[ohlc["Date"] >= view_start].copy()
+    if ohlc_view.empty:
+        raise ValueError(f"No data returned for {ticker_symbol} in the last {days} days.")
+    ohlc_view["Date_str"] = ohlc_view["Date"].dt.strftime("%Y-%m-%d")
 
-    last_row = ohlc.iloc[-1]
+    # Latest levels (use the VIEW window)
+    last_row = ohlc_view.iloc[-1]
     pp = (last_row["High"] + last_row["Low"] + last_row["Close"]) / 3
     r1 = (2 * pp) - last_row["Low"]
     s1 = (2 * pp) - last_row["High"]
@@ -213,15 +230,7 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     s2 = pp - (last_row["High"] - last_row["Low"])
     print(f"\n📊 {ticker_symbol} Levels: Pivot={pp:.2f}, R1={r1:.2f}, S1={s1:.2f}, R2={r2:.2f}, S2={s2:.2f}\n")
 
-    ohlc["Donchian_Upper"] = ohlc["High"].rolling(window=donchian_window).max()
-    ohlc["Donchian_Lower"] = ohlc["Low"].rolling(window=donchian_window).min()
-    ohlc["Donchian_Middle"] = (ohlc["Donchian_Upper"] + ohlc["Donchian_Lower"]) / 2
-
-    if len(ohlc) > days:
-        ohlc = ohlc.iloc[-days:].copy()
-
     # --- Create Subplots (4 rows: Price, RSI, Volume, MAs) ---
-
     fig = make_subplots(
         rows=4, cols=1, shared_xaxes=True,
         row_heights=[0.52, 0.18, 0.12, 0.18],
@@ -234,95 +243,100 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
         )
     )
 
+    # Candlestick
+    fig.add_trace(go.Candlestick(
+        x=ohlc_view["Date_str"],
+        open=ohlc_view["Open"],
+        high=ohlc_view["High"],
+        low=ohlc_view["Low"],
+        close=ohlc_view["Close"],
+        increasing_line_color="green",
+        decreasing_line_color="red",
+        showlegend=False
+    ), row=1, col=1)
 
-    fig.add_trace(go.Candlestick(x=ohlc["Date_str"], open=ohlc["Open"], high=ohlc["High"],
-                                 low=ohlc["Low"], close=ohlc["Close"],
-                                 increasing_line_color="green", decreasing_line_color="red",
-                                 showlegend=False), row=1,col=1)
-
-    fig.add_trace(go.Scatter(x=ohlc["Date_str"], y=ohlc["Donchian_Upper"],
-                             line=dict(color="blue",width=1), name="Donchian Upper"), row=1,col=1)
-    fig.add_trace(go.Scatter(x=ohlc["Date_str"], y=ohlc["Donchian_Lower"],
-                             line=dict(color="blue",width=1), name="Donchian Lower"), row=1,col=1)
-    fig.add_trace(go.Scatter(x=ohlc["Date_str"], y=ohlc["Donchian_Middle"],
-                             line=dict(color="blue",width=1,dash="dot"), name="Donchian Mid"), row=1,col=1)
-
-    fig.add_trace(go.Scatter(x=ohlc["Date_str"], y=ohlc["RSI"],
-                             mode="lines", line=dict(color="blue"), name="RSI (14)"), row=2,col=1)
-
-    fig.add_hline(y=70, line=dict(color="red", dash="dash"), row=2,col=1)
-    fig.add_hline(y=30, line=dict(color="green", dash="dash"), row=2,col=1)
-
-    fig.add_trace(go.Bar(x=ohlc["Date_str"], y=ohlc["Volume"],
-                         marker_color="purple", opacity=0.5, name="Volume"), row=3,col=1)
-
-    # --- Moving Averages (Row 4) ---
+    # Donchian Bands
     fig.add_trace(go.Scatter(
-        x=ohlc["Date_str"], y=ohlc["SMA20"],
+        x=ohlc_view["Date_str"], y=ohlc_view["Donchian_Upper"],
+        line=dict(color="blue", width=1),
+        name="Donchian Upper",
+        mode="lines"
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=ohlc_view["Date_str"], y=ohlc_view["Donchian_Lower"],
+        line=dict(color="blue", width=1),
+        name="Donchian Lower",
+        mode="lines"
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=ohlc_view["Date_str"], y=ohlc_view["Donchian_Middle"],
+        line=dict(color="blue", width=1, dash="dot"),
+        name="Donchian Mid",
+        mode="lines"
+    ), row=1, col=1)
+
+    # RSI
+    fig.add_trace(go.Scatter(
+        x=ohlc_view["Date_str"], y=ohlc_view["RSI"],
+        mode="lines", line=dict(color="blue"),
+        name="RSI (14)"
+    ), row=2, col=1)
+    fig.add_hline(y=70, line=dict(color="red", dash="dash"), row=2, col=1)
+    fig.add_hline(y=30, line=dict(color="green", dash="dash"), row=2, col=1)
+
+    # Volume
+    fig.add_trace(go.Bar(
+        x=ohlc_view["Date_str"],
+        y=ohlc_view["Volume"],
+        marker_color="purple",
+        name="Volume",
+        opacity=0.5
+    ), row=3, col=1)
+
+    # Moving Averages (separate pane)
+    fig.add_trace(go.Scatter(
+        x=ohlc_view["Date_str"], y=ohlc_view["SMA20"],
         mode="lines", line=dict(width=2, color="orange"),
         name="SMA 20"
     ), row=4, col=1)
-    
     fig.add_trace(go.Scatter(
-        x=ohlc["Date_str"], y=ohlc["SMA50"],
+        x=ohlc_view["Date_str"], y=ohlc_view["SMA50"],
         mode="lines", line=dict(width=2, color="purple"),
         name="SMA 50"
     ), row=4, col=1)
-    
+    # plot only valid SMA200 points (avoids drawing nothing if early NaNs exist)
+    valid200 = ohlc_view["SMA200"].notna()
     fig.add_trace(go.Scatter(
-        x=ohlc["Date_str"], y=ohlc["SMA200"],
+        x=ohlc_view.loc[valid200, "Date_str"],
+        y=ohlc_view.loc[valid200, "SMA200"],
         mode="lines", line=dict(width=2, color="gray"),
         name="SMA 200"
     ), row=4, col=1)
 
-    # --- Pivot & S/R lines on the price chart (Row 1) ---
-    fig.add_hline(
-        y=pp,
-        line=dict(color="black", width=1, dash="dot"),
-        annotation_text="",
-        annotation_position="top left",
-        row=1, col=1
-    )
+    # Pivot & S/R lines (price pane)
+    fig.add_hline(y=pp, line=dict(color="black", width=1, dash="dot"),
+                  annotation_text="", annotation_position="top left",
+                  row=1, col=1)
+    fig.add_hline(y=r1, line=dict(color="red", width=1, dash="dash"),
+                  annotation_text="", annotation_position="top left",
+                  row=1, col=1)
+    fig.add_hline(y=r2, line=dict(color="red", width=1, dash="dashdot"),
+                  annotation_text="", annotation_position="top left",
+                  row=1, col=1)
+    fig.add_hline(y=s1, line=dict(color="green", width=1, dash="dash"),
+                  annotation_text="", annotation_position="bottom left",
+                  row=1, col=1)
+    fig.add_hline(y=s2, line=dict(color="green", width=1, dash="dashdot"),
+                  annotation_text="", annotation_position="bottom left",
+                  row=1, col=1)
 
-    fig.add_hline(
-        y=r1,
-        line=dict(color="red", width=1, dash="dash"),
-        annotation_text="",
-        annotation_position="top left",
-        row=1, col=1
-    )
-
-    fig.add_hline(
-        y=r2,
-        line=dict(color="red", width=1, dash="dashdot"),
-        annotation_text="",
-        annotation_position="top left",
-        row=1, col=1
-    )
-
-    fig.add_hline(
-        y=s1,
-        line=dict(color="green", width=1, dash="dash"),
-        annotation_text="",
-        annotation_position="bottom left",
-        row=1, col=1
-    )
-
-    fig.add_hline(
-        y=s2,
-        line=dict(color="green", width=1, dash="dashdot"),
-        annotation_text="",
-        annotation_position="bottom left",
-        row=1, col=1
-    )
-    # --- Compact info box with latest levels ---
+    # Levels info box
     levels_text = (
         f"<b>{ticker_symbol} Levels</b><br>"
         f"PP: {pp:.2f}<br>"
         f"R1: {r1:.2f} &nbsp; R2: {r2:.2f}<br>"
         f"S1: {s1:.2f} &nbsp; S2: {s2:.2f}"
     )
-
     fig.add_annotation(
         xref="paper", yref="paper",
         x=0.01, y=0.98,
@@ -334,24 +348,33 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
         text=levels_text
     )
 
+    # Layout (landscape)
     fig.update_layout(
         title=f"{ticker_symbol} - Last {days} Days",
         template="plotly_white",
-        width=1400,   # wider
-        height=700,   # shorter
+        width=1400,
+        height=1200,
         xaxis_rangeslider_visible=False,
         xaxis=dict(type="category")
     )
 
-    ymin = ohlc["Low"].min()*0.98
-    ymax = ohlc["High"].max()*1.02
-    fig.update_yaxes(range=[ymin,ymax], row=1,col=1)
+    # Axis ranges based on the VIEW window
+    ymin = ohlc_view["Low"].min() * 0.98
+    ymax = ohlc_view["High"].max() * 1.02
+    fig.update_yaxes(range=[ymin, ymax], row=1, col=1)
 
-    rmin = max(0, ohlc["RSI"].min()*0.98)
-    rmax = min(100, ohlc["RSI"].max()*1.02)
-    fig.update_yaxes(range=[rmin,rmax], row=2,col=1)
+    rmin = max(0, ohlc_view["RSI"].min() * 0.98)
+    rmax = min(100, ohlc_view["RSI"].max() * 1.02)
+    fig.update_yaxes(range=[rmin, rmax], row=2, col=1)
+
+    # Optional: tidy MA pane range
+    ma_min = pd.concat([ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1).min().min()
+    ma_max = pd.concat([ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1).max().max()
+    if pd.notna(ma_min) and pd.notna(ma_max):
+        fig.update_yaxes(range=[ma_min * 0.98, ma_max * 1.02], row=4, col=1)
 
     return fig
+
 
 # --- Send chart helper ---
 def send_chart(chat_id, symbol, days=365):
