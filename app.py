@@ -348,12 +348,12 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
         text=levels_text
     )
 
-    # Layout (landscape)
+    # Layout (landscape, Mac screen friendly)
     fig.update_layout(
         title=f"{ticker_symbol} - Last {days} Days",
         template="plotly_white",
-        width=1400,
-        height=1200,
+        width=1600,    # nice wide aspect for Mac
+        height=800,    # shorter, fits screen better
         xaxis_rangeslider_visible=False,
         xaxis=dict(type="category")
     )
@@ -368,8 +368,14 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     fig.update_yaxes(range=[rmin, rmax], row=2, col=1)
 
     # Optional: tidy MA pane range
-    ma_min = pd.concat([ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1).min().min()
-    ma_max = pd.concat([ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1).max().max()
+    ma_min = pd.concat(
+        [ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1
+    ).min().min()
+    
+    ma_max = pd.concat(
+        [ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1
+    ).max().max()
+    
     if pd.notna(ma_min) and pd.notna(ma_max):
         fig.update_yaxes(range=[ma_min * 0.98, ma_max * 1.02], row=4, col=1)
 
