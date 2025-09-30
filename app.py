@@ -186,7 +186,7 @@ def calculate_rsi(series, period=14):
 def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     internal_days = max(days, 220)
     end_date = datetime.today() + timedelta(days=1)
-    start_date = end_date - timedelta(days=days)
+    start_date = end_date - timedelta(days=internal_days)
 
     ticker = yf.Ticker(ticker_symbol)
     ohlc = ticker.history(start=start_date, end=end_date, interval="1d").reset_index()
