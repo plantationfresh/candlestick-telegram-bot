@@ -372,15 +372,16 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     rmax = min(100, ohlc_view["RSI"].max() * 1.02)
     fig.update_yaxes(range=[rmin, rmax], row=2, col=1)
 
-    # Optional: tidy MA pane range
+    # --- Tidy MA + Close axis range ---
     ma_min = pd.concat(
-        [ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1
+        [ohlc_view["Close"], ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]],
+        axis=1
     ).min().min()
-    
     ma_max = pd.concat(
-        [ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]], axis=1
+        [ohlc_view["Close"], ohlc_view["SMA20"], ohlc_view["SMA50"], ohlc_view["SMA200"]],
+        axis=1
     ).max().max()
-    
+
     if pd.notna(ma_min) and pd.notna(ma_max):
         fig.update_yaxes(range=[ma_min * 0.98, ma_max * 1.02], row=4, col=1)
 
