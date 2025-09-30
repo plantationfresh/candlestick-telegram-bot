@@ -184,7 +184,8 @@ def calculate_rsi(series, period=14):
 
 # --- Chart Function ---
 def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
-    internal_days = max(days, 220)
+    buffer_days = 260  # ~1 trading year ≈ 252 sessions; add a cushion
+    internal_days = max(days + buffer_days, 420)
     end_date = datetime.today() + timedelta(days=1)
     start_date = end_date - timedelta(days=internal_days)
 
