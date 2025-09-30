@@ -194,6 +194,12 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     ohlc["Date_str"] = ohlc["Date"].dt.strftime("%Y-%m-%d")
     ohlc["RSI"] = calculate_rsi(ohlc["Close"])
 
+    # --- Moving Averages ---
+    ohlc["SMA20"]  = ohlc["Close"].rolling(window=20).mean()
+    ohlc["SMA50"]  = ohlc["Close"].rolling(window=50).mean()
+    ohlc["SMA200"] = ohlc["Close"].rolling(window=200).mean()
+
+
     if ohlc.empty:
         raise ValueError(f"No data returned for {ticker_symbol}. Try a different symbol or longer period.")
 
@@ -209,9 +215,20 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     ohlc["Donchian_Lower"] = ohlc["Low"].rolling(window=donchian_window).min()
     ohlc["Donchian_Middle"] = (ohlc["Donchian_Upper"] + ohlc["Donchian_Lower"]) / 2
 
-    fig = make_subplots(rows=3, cols=1, shared_xaxes=True,
-                        row_heights=[0.6,0.2,0.2], vertical_spacing=0.05,
-                        subplot_titles=(f"{ticker_symbol} - Candlestick Chart","RSI (14)","Volume"))
+    # --- Create Subplots (4 rows: Price, RSI, Volume, MAs) ---
+
+    fig = make_subplots(
+        rows=4, cols=1, shared_xaxes=True,
+        row_heights=[0.52, 0.18, 0.12, 0.18],
+        vertical_spacing=0.05,
+        subplot_titles=(
+            f"{ticker_symbol} - Candlestick Chart",
+            "RSI (14)",
+            "Volume",
+            "Moving Averages (20 / 50 / 200)"
+        )
+    )
+
 
     fig.add_trace(go.Candlestick(x=ohlc["Date_str"], open=ohlc["Open"], high=ohlc["High"],
                                  low=ohlc["Low"], close=ohlc["Close"],
@@ -233,6 +250,25 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
 
     fig.add_trace(go.Bar(x=ohlc["Date_str"], y=ohlc["Volume"],
                          marker_color="purple", opacity=0.5, name="Volume"), row=3,col=1)
+
+    # --- Moving Averages (Row 4) ---
+    fig.add_trace(go.Scatter(
+        x=ohlc["Date_str"], y=ohlc["SMA20"],
+        mode="lines", line=dict(width=2, color="orange"),
+        name="SMA 20"
+    ), row=4, col=1)
+    
+    fig.add_trace(go.Scatter(
+        x=ohlc["Date_str"], y=ohlc["SMA50"],
+        mode="lines", line=dict(width=2, color="purple"),
+        name="SMA 50"
+    ), row=4, col=1)
+    
+    fig.add_trace(go.Scatter(
+        x=ohlc["Date_str"], y=ohlc["SMA200"],
+        mode="lines", line=dict(width=2, color="gray"),
+        name="SMA 200"
+    ), row=4, col=1)
 
     # --- Pivot & S/R lines on the price chart (Row 1) ---
     fig.add_hline(
