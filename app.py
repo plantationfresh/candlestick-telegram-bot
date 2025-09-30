@@ -295,6 +295,11 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
 
     # Moving Averages (separate pane)
     fig.add_trace(go.Scatter(
+        x=ohlc_view["Date_str"], y=ohlc_view["Close"],
+        mode="lines", line=dict(width=2, color="black"),
+        name="Close"
+    ), row=4, col=1)
+    fig.add_trace(go.Scatter(
         x=ohlc_view["Date_str"], y=ohlc_view["SMA20"],
         mode="lines", line=dict(width=2, color="orange"),
         name="SMA 20"
