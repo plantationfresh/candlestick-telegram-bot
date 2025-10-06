@@ -57,6 +57,32 @@ def save_watchlist(watchlist):
 
 WATCHLIST = load_watchlist()
 
+def get_pe_and_marketcap(ticker_symbol):
+    try:
+        t = yf.Ticker(ticker_symbol)
+
+        # Try fast_info first (faster + lighter)
+        fi = getattr(t, "fast_info", None)
+        pe = None
+        market_cap = None
+        if fi:
+            pe = fi.get("trailing_pe", None)
+            market_cap = fi.get("market_cap", None)
+
+        # Fallback to full info if missing
+        if pe is None or market_cap is None:
+            info = t.info
+            if pe is None:
+                pe = info.get("trailingPE", None)
+            if market_cap is None:
+                market_cap = info.get("marketCap", None)
+
+        return pe, market_cap
+    except Exception:
+        return None, None
+
+
+
 def send_all_charts(chat_id, days=180):
     """Generate and send charts for every watchlist item, sequentially."""
     items = list(sorted(WATCHLIST.items()))  # [(name, symbol), ...]
@@ -182,6 +208,28 @@ def calculate_rsi(series, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
+def format_market_cap(value):
+    if value is None:
+        return "—"
+    try:
+        value = float(value)
+    except:
+        return "—"
+
+    trillion = 1_000_000_000_000
+    billion  = 1_000_000_000
+    million  = 1_000_000
+
+    if value >= trillion:
+        return f"{value/trillion:.2f}T"
+    elif value >= billion:
+        return f"{value/billion:.2f}B"
+    elif value >= million:
+        return f"{value/million:.2f}M"
+    else:
+        return str(int(value))
+
+
 # --- Chart Function ---
 def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     # --- Fetch OHLC Data with extra buffer so SMA200 is available ---
@@ -228,7 +276,12 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     s1 = (2 * pp) - last_row["High"]
     r2 = pp + (last_row["High"] - last_row["Low"])
     s2 = pp - (last_row["High"] - last_row["Low"])
-    print(f"\n📊 {ticker_symbol} Levels: Pivot={pp:.2f}, R1={r1:.2f}, S1={s1:.2f}, R2={r2:.2f}, S2={s2:.2f}\n")
+    pe, market_cap = get_pe_and_marketcap(ticker_symbol)
+
+    pe_line = f"PE: {pe:.2f}" if pe is not None else "PE: —"
+    mc_line = f"Market Cap: {format_market_cap(market_cap)}"
+
+    #print(f"\n📊 {ticker_symbol} Levels: Pivot={pp:.2f}, R1={r1:.2f}, S1={s1:.2f}, R2={r2:.2f}, S2={s2:.2f}\n")
 
     # --- Create Subplots (4 rows: Price, RSI, Volume, MAs) ---
     fig = make_subplots(
@@ -335,13 +388,17 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
                   annotation_text="", annotation_position="bottom left",
                   row=1, col=1)
 
-    # Levels info box
     levels_text = (
         f"<b>{ticker_symbol} Levels</b><br>"
         f"PP: {pp:.2f}<br>"
         f"R1: {r1:.2f} &nbsp; R2: {r2:.2f}<br>"
-        f"S1: {s1:.2f} &nbsp; S2: {s2:.2f}"
+        f"S1: {s1:.2f} &nbsp; S2: {s2:.2f}<br>"
+        f"<br><b>Valuation</b><br>"
+        f"{pe_line}<br>"
+        f"{mc_line}"
     )
+
+
     fig.add_annotation(
         xref="paper", yref="paper",
         x=0.01, y=0.98,
