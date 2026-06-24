@@ -639,7 +639,8 @@ def add_cover_page(c, results, pw, ph):
 
     closest = sorted(
         results,
-        key=lambda x: x["volume_ratio"]
+        key=lambda x: x["volume_ratio"],
+        reverse=True
     )
     
     headers = [
