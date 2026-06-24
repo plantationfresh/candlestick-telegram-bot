@@ -655,8 +655,7 @@ def add_cover_page(c, results, pw, ph):
         "DIST"
     ]
 
-    table_top = ph - 150
-    table_bottom = ph
+    table_top = ph - 100
 
     cols = [
         40,     # rank
@@ -670,6 +669,8 @@ def add_cover_page(c, results, pw, ph):
         710,    # 200ma
         790     # dist
     ]
+
+    table_bottom = table_top + len(cols)*20
     
     #c.setFillColor(colors.lightblue)
     
@@ -1135,10 +1136,6 @@ def telegram_webhook():
                         json={
                             "chat_id": chat_id,
                             "text":
-                                f"🚀 Breakout Scan Complete\n\n"
-                                f"Candidates Found: {len(results)}\n\n"
-                                f"Closest To Breakout:\n\n"
-                                f"{summary}\n\n"
                                 f"📄 Generating PDF..."
                         }
                     )
