@@ -698,22 +698,28 @@ def add_cover_page(c, results, pw, ph):
     closest = sorted(
         results,
         key=lambda x: x["distance"]
-    )[:10]
-
+    )
+    
     headers = [
         "#",
-        "Stock",
+        "STOCK",
+        "%CHG",
         "RSI",
-        "Vol",
-        "Dist"
+        "20MA",
+        "50MA",
+        "200MA",
+        "DIST"
     ]
 
     cols = [
-        50,
-        100,
-        280,
-        350,
-        450
+        40,     # rank
+        80,     # stock
+        250,    # %chg
+        330,    # rsi
+        400,    # 20ma
+        470,    # 50ma
+        540,    # 200ma
+        630     # dist
     ]
 
     c.setFillColor(colors.lightblue)
@@ -745,39 +751,75 @@ def add_cover_page(c, results, pw, ph):
         closest,
         start=1
     ):
-
+    
         c.drawString(
             cols[0],
             y,
             str(idx)
         )
-
+    
         c.drawString(
             cols[1],
             y,
             stock["name"]
         )
-
-        c.drawString(
-            cols[2],
+    
+        c.drawRightString(
+            cols[2] + 50,
+            y,
+            f"{stock['pct_change']:.1f}%"
+        )
+    
+        c.drawRightString(
+            cols[3] + 30,
             y,
             f"{stock['rsi']:.0f}"
         )
 
-        c.drawString(
-            cols[3],
+        c.setFillColor(
+            colors.green
+            if stock["above20"]
+            else colors.red
+        )
+        
+        c.drawCentredString(
+            cols[4],
             y,
-            f"{stock['volume_ratio']:.1f}x"
+            "✓" if stock["above20"] else "✗"
+        )
+        
+        c.setFillColor(
+            colors.green
+            if stock["above50"]
+            else colors.red
+        )
+        
+        c.drawCentredString(
+            cols[5],
+            y,
+            "✓" if stock["above50"] else "✗"
         )
 
-        c.drawString(
-            cols[4],
+        c.setFillColor(
+            colors.green
+            if stock["above200"]
+            else colors.red
+        )
+        
+        c.drawCentredString(
+            cols[6],
+            y,
+            "✓" if stock["above200"] else "✗"
+        )
+    
+        c.drawRightString(
+            cols[7] + 40,
             y,
             f"{stock['distance']:.1f}%"
         )
-
-        y -= 20
-
+    
+        y -= 18
+        
     c.showPage()
 
 
