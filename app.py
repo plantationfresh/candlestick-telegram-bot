@@ -709,13 +709,13 @@ def create_scan_image(results):
                 font=header_font
             )
 
-    draw.line(
-        [(20, y + 35), (width - 20, y + 35)],
-        fill=(40, 50, 70),
-        width=1
-    )
-    
-    y += row_h
+        draw.line(
+            [(20, y + 35), (width - 20, y + 35)],
+            fill=(40, 50, 70),
+            width=1
+        )
+        
+        y += row_h
 
     buf = io.BytesIO()
 
