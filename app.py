@@ -649,10 +649,8 @@ def add_cover_page(c, results, pw, ph):
         stroke=0
     )
 
-    c.setFillColor(colors.black)
-
     for txt, x in zip(headers, cols):
-
+        c.setFont("Helvetica", 18)
         c.drawString(
             x,
             y,
