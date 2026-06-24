@@ -629,8 +629,8 @@ def add_cover_page(c, results, pw, ph):
         "DIST"
     ]
 
-    table_top = ph - 180
-    table_bottom = y - 10
+    table_top = ph - 150
+    table_bottom = y
 
     cols = [
         40,     # rank
