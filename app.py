@@ -611,9 +611,9 @@ def add_cover_page(c, results, pw, ph):
         "BREAKOUT WATCHLIST"
     )
 
-    c.setFont("Helvetica", 12)
+    #c.setFont("Helvetica", 12)
 
-    c.drawCentredString(
+    #c.drawCentredString(
         pw / 2,
         ph - 75,
         f"{len(results)} candidates found"
@@ -621,61 +621,61 @@ def add_cover_page(c, results, pw, ph):
 
     # Summary stats
 
-    avg_rsi = sum(
+    #avg_rsi = sum(
         r["rsi"] for r in results
     ) / len(results)
 
-    above20 = sum(
+    #above20 = sum(
         r["above20"] for r in results
     )
 
-    above50 = sum(
+    #above50 = sum(
         r["above50"] for r in results
     )
 
-    above200 = sum(
+    #above200 = sum(
         r["above200"] for r in results
     )
 
-    y = ph - 130
+    y = ph - 100
 
-    c.setFont("Helvetica-Bold", 14)
+    #c.setFont("Helvetica-Bold", 14)
 
-    c.drawString(
+    #c.drawString(
         50,
         y,
         "Market Summary"
     )
 
-    c.setFont("Helvetica", 12)
+    #c.setFont("Helvetica", 12)
 
-    y -= 30
+    #y -= 30
 
-    c.drawString(
+    #c.drawString(
         60,
         y,
         f"Average RSI: {avg_rsi:.1f}"
     )
 
-    y -= 20
+    #y -= 20
 
-    c.drawString(
+    #c.drawString(
         60,
         y,
         f"Above 20 MA: {above20}"
     )
 
-    y -= 20
+    #y -= 20
 
-    c.drawString(
+    #c.drawString(
         60,
         y,
         f"Above 50 MA: {above50}"
     )
 
-    y -= 20
+    #y -= 20
 
-    c.drawString(
+    #c.drawString(
         60,
         y,
         f"Above 200 MA: {above200}"
@@ -683,7 +683,7 @@ def add_cover_page(c, results, pw, ph):
 
     # Top 10 table
 
-    y -= 60
+    #y -= 60
 
     c.setFont("Helvetica-Bold", 14)
 
@@ -722,7 +722,7 @@ def add_cover_page(c, results, pw, ph):
         630     # dist
     ]
 
-    c.setFillColor(colors.lightblue)
+    #c.setFillColor(colors.lightblue)
 
     c.rect(
         40,
