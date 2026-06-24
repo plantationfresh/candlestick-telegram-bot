@@ -697,27 +697,27 @@ def create_scan_image(results):
 
         title_font = ImageFont.truetype(
             "fonts/JetBrainsMono-ExtraBoldItalic.ttf",
-            90
+            120
         )
         
         subtitle_font = ImageFont.truetype(
             "fonts/JetBrainsMono-ExtraBold.ttf",
-            36
+            66
         )
         
         header_font = ImageFont.truetype(
             "fonts/JetBrainsMono-ExtraBold.ttf",
-            32
+            62
         )
         
         stock_font = ImageFont.truetype(
             "fonts/JetBrainsMono-ExtraBold.ttf",
-            44
+            64
         )
         
         value_font = ImageFont.truetype(
             "fonts/JetBrainsMono-ExtraBold.ttf",
-            34
+            64
         )
 
         font = ImageFont.truetype(
@@ -727,7 +727,7 @@ def create_scan_image(results):
 
         badge_font = ImageFont.truetype(
             "JetBrainsMono-ExtraBold.ttf",
-            26
+            56
         )
 
     except:
