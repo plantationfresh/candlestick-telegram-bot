@@ -611,89 +611,7 @@ def add_cover_page(c, results, pw, ph):
         "BREAKOUT WATCHLIST"
     )
 
-    #c.setFont("Helvetica", 12)
-
-    #c.drawCentredString(
-        pw / 2,
-        ph - 75,
-        f"{len(results)} candidates found"
-    )
-
-    # Summary stats
-
-    #avg_rsi = sum(
-        r["rsi"] for r in results
-    ) / len(results)
-
-    #above20 = sum(
-        r["above20"] for r in results
-    )
-
-    #above50 = sum(
-        r["above50"] for r in results
-    )
-
-    #above200 = sum(
-        r["above200"] for r in results
-    )
-
     y = ph - 100
-
-    #c.setFont("Helvetica-Bold", 14)
-
-    #c.drawString(
-        50,
-        y,
-        "Market Summary"
-    )
-
-    #c.setFont("Helvetica", 12)
-
-    #y -= 30
-
-    #c.drawString(
-        60,
-        y,
-        f"Average RSI: {avg_rsi:.1f}"
-    )
-
-    #y -= 20
-
-    #c.drawString(
-        60,
-        y,
-        f"Above 20 MA: {above20}"
-    )
-
-    #y -= 20
-
-    #c.drawString(
-        60,
-        y,
-        f"Above 50 MA: {above50}"
-    )
-
-    #y -= 20
-
-    #c.drawString(
-        60,
-        y,
-        f"Above 200 MA: {above200}"
-    )
-
-    # Top 10 table
-
-    #y -= 60
-
-    c.setFont("Helvetica-Bold", 14)
-
-    c.drawString(
-        50,
-        y,
-        "Top 10 Closest To Breakout"
-    )
-
-    y -= 30
 
     closest = sorted(
         results,
@@ -721,8 +639,6 @@ def add_cover_page(c, results, pw, ph):
         540,    # 200ma
         630     # dist
     ]
-
-    #c.setFillColor(colors.lightblue)
 
     c.rect(
         40,
