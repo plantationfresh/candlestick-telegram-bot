@@ -655,8 +655,6 @@ def add_cover_page(c, results, pw, ph):
         "DIST"
     ]
 
-    table_top = ph - 100
-
     cols = [
         40,     # rank
         80,     # stock
@@ -670,7 +668,8 @@ def add_cover_page(c, results, pw, ph):
         790     # dist
     ]
 
-    table_bottom = table_top + len(cols)*20
+    table_top = header_y + 15
+    table_bottom = y - 10
     
     #c.setFillColor(colors.lightblue)
     
@@ -685,6 +684,20 @@ def add_cover_page(c, results, pw, ph):
     
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 18)
+
+    c.setStrokeColor(colors.lightgrey)
+    c.setLineWidth(0.5)
+
+    for x in cols[1:]:
+    
+        c.line(
+            x - 10,
+            table_bottom,
+            x - 10,
+            table_top
+        )
+        
+    c.setFillColor(colors.black)
     
     for txt, x in zip(headers, cols):
         
@@ -693,17 +706,7 @@ def add_cover_page(c, results, pw, ph):
             y,
             txt
         )
-        
-        c.setStrokeColor(colors.lightgrey)
 
-        c.line(
-            x - 10,
-            table_bottom,
-            x - 10,
-            table_top
-        )
-
-        c.setFillColor(colors.black)
     
     y -= 25
 
@@ -816,7 +819,18 @@ def add_cover_page(c, results, pw, ph):
             y,
             f"{stock['distance']:.1f}%"
         )
-    
+
+        c.setStrokeColor(colors.lightgrey)
+
+        c.line(
+            30,
+            y - 5,
+            850,
+            y - 5
+        )
+        
+        c.setFillColor(colors.black)
+        
         y -= 18
 
         
