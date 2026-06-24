@@ -569,7 +569,7 @@ def scan_watchlist(top_n=25):
 
 def create_scan_image(results):
 
-    width = 1600
+    width = 1200
     row_h = 45
     height = 140 + (len(results) * row_h)
 
@@ -584,19 +584,25 @@ def create_scan_image(results):
     try:
         title_font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            34
+            48
         )
-
+        
+        header_font = ImageFont.truetype(
+            "DejaVuSans-Bold.ttf",
+            28
+        )
+        
         font = ImageFont.truetype(
             "DejaVuSans.ttf",
-            22
+            26
         )
 
     except:
 
         title_font = ImageFont.load_default()
+        header_font = ImageFont.load_default()
         font = ImageFont.load_default()
-
+        
     draw.text(
         (20, 20),
         "TOP SCAN RESULTS",
@@ -618,14 +624,14 @@ def create_scan_image(results):
 
     xs = [
         20,    # Rank
-        100,   # Stock
-        450,   # Vol
-        600,   # Change
-        720,   # RSI
-        820,   # 20MA
-        920,   # 50MA
-        1030,  # 200MA
-        1170   # Dist
+        80,    # Stock
+        380,   # Vol
+        500,   # Chg
+        610,   # RSI
+        700,   # 20MA
+        790,   # 50MA
+        880,   # 200MA
+        1000   # Dist
     ]
 
     y = 90
@@ -652,6 +658,15 @@ def create_scan_image(results):
         dist = stock["distance"]
 
         if dist < 0:
+            dist_color = (255, 215, 0)      # breakout
+        elif dist <= 1:
+            dist_color = (0, 255, 120)      # very close
+        elif dist <= 3:
+            dist_color = (150, 255, 150)
+        else:
+            dist_color = (255, 255, 255)
+
+        if dist < 0:
             dist_text = "🚀 BO"
         else:
             dist_text = f"{dist:.1f}%"
@@ -662,27 +677,45 @@ def create_scan_image(results):
             f"{stock['volume_ratio']:.1f}x",
             f"{stock['pct_change']:.1f}%",
             f"{stock['rsi']:.0f}",
-            "✅" if stock["above20"] else "❌",
-            "✅" if stock["above50"] else "❌",
-            "✅" if stock["above200"] else "❌",
+            "🟢" if stock["above20"] else "🔴",
+            "🟢" if stock["above50"] else "🔴",
+            "🟢" if stock["above200"] else "🔴",
             dist_text
         ]
 
         for i, (value, x) in enumerate(zip(row, xs)):
 
             color = (255,255,255)
-
+        
+            # % Change column
             if i == 3:
                 color = chg_color
+        
+            # Dist→Upper column
+            elif i == 8:
+                color = dist_color
 
+            elif i in [5,6,7]:
+
+                if value == "🟢":
+                    color = (0,255,120)
+                else:
+                    color = (255,80,80)
+        
             draw.text(
-                (x,y),
+                (x, y),
                 value,
                 fill=color,
-                font=font
+                font=header_font
             )
 
-        y += row_h
+    draw.line(
+        [(20, y + 35), (width - 20, y + 35)],
+        fill=(40, 50, 70),
+        width=1
+    )
+    
+    y += row_h
 
     buf = io.BytesIO()
 
