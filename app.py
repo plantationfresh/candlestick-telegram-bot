@@ -568,14 +568,15 @@ def scan_watchlist(top_n=25):
 
 def create_scan_image(results):
 
-    width = 2200
+    width = 2400
     row_h = 55
-    height = 180 + (len(results) * row_h)
+    header_h = 180
+    height = header_h + (len(results) * row_h) + 50
 
     img = Image.new(
         "RGB",
         (width, height),
-        (15, 20, 30)
+        (8, 15, 28)
     )
 
     draw = ImageDraw.Draw(img)
@@ -583,139 +584,193 @@ def create_scan_image(results):
     try:
         title_font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            64
+            72
         )
-        
+
         header_font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
             34
         )
-        
+
         font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            30
+            28
         )
 
     except:
-
         title_font = ImageFont.load_default()
         header_font = ImageFont.load_default()
         font = ImageFont.load_default()
-        
+
+    # -----------------------------
+    # TITLE
+    # -----------------------------
     title = f"TOP {len(results)} BREAKOUT CANDIDATES"
 
     draw.text(
         (40, 25),
         title,
-        fill=(0,255,120),
+        fill=(0, 255, 80),
         font=title_font
     )
 
+    # -----------------------------
+    # HEADER BAND
+    # -----------------------------
+    draw.rectangle(
+        [(20, 120), (width - 20, 175)],
+        fill=(15, 55, 120)
+    )
+
     headers = [
-        "Rank",
-        "Stock",
-        "Vol x",
-        "%Chg",
+        "RANK",
+        "STOCK",
+        "VOL X",
+        "%CHG",
         "RSI",
         "20MA",
         "50MA",
         "200MA",
-        "Dist→Upper"
+        "DIST→UPPER"
     ]
 
     xs = [
-        40,     # Rank
-        160,    # Stock
-        800,    # Vol
-        980,    # Chg
-        1150,   # RSI
-        1300,   # 20MA
-        1450,   # 50MA
-        1600,   # 200MA
-        1800    # Dist
+        60,
+        200,
+        900,
+        1100,
+        1300,
+        1500,
+        1700,
+        1900,
+        2120
     ]
 
-    y = 90
-
     for h, x in zip(headers, xs):
-
         draw.text(
-            (x,y),
+            (x, 130),
             h,
-            fill=(255,255,255),
-            font=font
+            fill=(255, 255, 255),
+            font=header_font
         )
 
-    y += row_h
+    # -----------------------------
+    # VERTICAL SEPARATORS
+    # -----------------------------
+    for x in xs[1:]:
+        draw.line(
+            [(x - 40, 120), (x - 40, height - 20)],
+            fill=(60, 80, 120),
+            width=1
+        )
 
+    y = 190
+
+    # -----------------------------
+    # ROWS
+    # -----------------------------
     for idx, stock in enumerate(results, start=1):
 
-        chg_color = (
-            (0,255,100)
-            if stock["pct_change"] >= 0
-            else (255,80,80)
+        # alternating row colors
+        row_bg = (
+            (14, 24, 40)
+            if idx % 2 == 0
+            else (8, 18, 30)
         )
 
+        draw.rectangle(
+            [(20, y - 5), (width - 20, y + row_h - 5)],
+            fill=row_bg
+        )
+
+        pct = stock["pct_change"]
         dist = stock["distance"]
 
-        if dist < 0:
-            dist_color = (255, 215, 0)      # breakout
-        elif dist <= 1:
-            dist_color = (0, 255, 120)      # very close
+        pct_color = (
+            (0, 255, 100)
+            if pct >= 0
+            else (255, 80, 80)
+        )
+
+        if dist <= 1:
+            dist_color = (0, 255, 80)
         elif dist <= 3:
-            dist_color = (150, 255, 150)
+            dist_color = (180, 255, 180)
         else:
             dist_color = (255, 255, 255)
 
-        if dist < 0:
-            dist_text = "🚀 BO"
-        else:
-            dist_text = f"{dist:.1f}%"
+        rank_color = (
+            (255, 215, 0)
+            if idx <= 5
+            else (255, 255, 255)
+        )
 
         row = [
             str(idx),
             stock["name"],
             f"{stock['volume_ratio']:.1f}x",
-            f"{stock['pct_change']:.1f}%",
+            f"{pct:.1f}%",
             f"{stock['rsi']:.0f}",
-            "🟢" if stock["above20"] else "🔴",
-            "🟢" if stock["above50"] else "🔴",
-            "🟢" if stock["above200"] else "🔴",
-            dist_text
+            "", "", "",
+            f"{dist:.1f}%"
         ]
 
         for i, (value, x) in enumerate(zip(row, xs)):
 
-            color = (255,255,255)
-        
-            # % Change column
-            if i == 3:
-                color = chg_color
-        
-            # Dist→Upper column
+            color = (255, 255, 255)
+
+            if i == 0:
+                color = rank_color
+
+            elif i == 3:
+                color = pct_color
+
             elif i == 8:
                 color = dist_color
 
-            elif i in [5,6,7]:
-
-                if value == "🟢":
-                    color = (0,255,120)
-                else:
-                    color = (255,80,80)
-        
             draw.text(
                 (x, y),
                 value,
                 fill=color,
-                font=header_font
+                font=font
             )
 
+        # -----------------------------
+        # MA CIRCLES
+        # -----------------------------
+        ma_cols = [
+            stock["above20"],
+            stock["above50"],
+            stock["above200"]
+        ]
+
+        ma_xs = [1500, 1700, 1900]
+
+        for flag, mx in zip(ma_cols, ma_xs):
+
+            circle_color = (
+                (50, 255, 80)
+                if flag
+                else (255, 60, 60)
+            )
+
+            draw.ellipse(
+                (
+                    mx,
+                    y + 5,
+                    mx + 24,
+                    y + 29
+                ),
+                fill=circle_color
+            )
+
+        # row separator
         draw.line(
-            [(20, y + 35), (width - 20, y + 35)],
-            fill=(70, 80, 100),
+            [(20, y + 45), (width - 20, y + 45)],
+            fill=(60, 80, 120),
             width=1
         )
-        
+
         y += row_h
 
     buf = io.BytesIO()
@@ -725,7 +780,7 @@ def create_scan_image(results):
         format="PNG",
         optimize=True
     )
-    
+
     buf.seek(0)
 
     return buf
