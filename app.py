@@ -698,9 +698,9 @@ def add_cover_page(c, results, pw, ph):
 
         c.line(
             x - 10,
-            table_top,
+            table_bottom,
             x - 10,
-            table_bottom
+            table_top
         )
 
         c.setFillColor(colors.black)
