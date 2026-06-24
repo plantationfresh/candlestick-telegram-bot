@@ -1130,7 +1130,7 @@ def telegram_webhook():
                     send_scan_pdf(
                         chat_id,
                         results,
-                        days=180
+                        days=365
                     )
             
                     requests.post(
