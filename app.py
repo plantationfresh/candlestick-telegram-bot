@@ -639,7 +639,7 @@ def add_cover_page(c, results, pw, ph):
 
     closest = sorted(
         results,
-        key=lambda x: x["distance"]
+        key=lambda x: x["volume_ratio"]
     )
     
     headers = [
@@ -744,15 +744,21 @@ def add_cover_page(c, results, pw, ph):
             y,
             f"{stock['position']*100:.0f}%"
         )
+
+        if stock["pct_change"] > 0:
+            c.setFillColor(colors.green)
+        else:
+            c.setFillColor(colors.red)
         
-        c.setFillColor(colors.black)
     
         c.drawRightString(
             cols[4] + 50,
             y,
             f"{stock['pct_change']:.1f}%"
         )
-    
+        
+        c.setFillColor(colors.black)
+        
         c.drawRightString(
             cols[5] + 20,
             y,
