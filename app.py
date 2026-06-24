@@ -629,6 +629,9 @@ def add_cover_page(c, results, pw, ph):
         "DIST"
     ]
 
+    table_top = ph - 180
+    table_bottom = y - 10
+
     cols = [
         40,     # rank
         80,     # stock
@@ -640,27 +643,39 @@ def add_cover_page(c, results, pw, ph):
         630     # dist
     ]
     
-    c.setFillColor(colors.lightblue)
+    #c.setFillColor(colors.lightblue)
     
     c.rect(
         40,
         y - 5,
         650,
         22,
-        fill=1,
-        stroke=1
+        fill=0,
+        stroke=0
     )
     
     c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 18)
     
     for txt, x in zip(headers, cols):
-        c.setFont("Helvetica-Bold", 18)
+        
         c.drawString(
             x,
             y,
             txt
         )
+        
+        c.setStrokeColor(colors.lightgrey)
 
+        c.line(
+            x - 10,
+            table_bottom,
+            x - 10,
+            table_top
+        )
+
+        c.setFillColor(colors.black)
+    
     y -= 25
 
     c.setFont("Helvetica", 11)
