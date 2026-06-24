@@ -701,32 +701,32 @@ def create_scan_image(results):
         )
         
         subtitle_font = ImageFont.truetype(
-            "fonts/JetBrainsMono-BoldItalic.ttf",
+            "fonts/JetBrainsMono-ExtraBold.ttf",
             36
         )
         
         header_font = ImageFont.truetype(
-            "fonts/JetBrainsMonoNL-Bold.ttf",
+            "fonts/JetBrainsMono-ExtraBold.ttf",
             32
         )
         
         stock_font = ImageFont.truetype(
-            "fonts/JetBrainsMonoNL-SemiBold.ttf",
+            "fonts/JetBrainsMono-ExtraBold.ttf",
             44
         )
         
         value_font = ImageFont.truetype(
-            "fonts/JetBrainsMono-Bold.ttf",
+            "fonts/JetBrainsMono-ExtraBold.ttf",
             34
         )
 
         font = ImageFont.truetype(
-            "JetBrainsMonoNL-SemiBold.ttf",
+            "JetBrainsMono-ExtraBold.ttf",
             30
         )
 
         badge_font = ImageFont.truetype(
-            "JetBrainsMonoNL-SemiBold.ttf",
+            "JetBrainsMono-ExtraBold.ttf",
             26
         )
 
