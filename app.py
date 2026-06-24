@@ -630,7 +630,7 @@ def add_cover_page(c, results, pw, ph):
     ]
 
     table_top = ph - 150
-    table_bottom = ph + 100
+    table_bottom = ph
 
     cols = [
         40,     # rank
