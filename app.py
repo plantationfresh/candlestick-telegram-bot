@@ -43,7 +43,7 @@ def load_watchlist():
         with open(WATCHLIST_FILE, "r") as f:
             return json.load(f)
     return {
-    "Reliance": "RELIANCE.NS",
+    "RELIANCE": "RELIANCE.NS",
     "M&M": "M&M.NS",
     "ARE&M": "ARE&M.NS",
     "SMLISUZU": "SMLISUZU.NS",
@@ -83,7 +83,7 @@ def get_pe_and_marketcap(ticker_symbol):
 
 
 
-def send_all_charts(chat_id, days=180):
+def send_all_charts(chat_id, days=365):
     """Generate and send charts for every watchlist item, sequentially."""
     items = list(sorted(WATCHLIST.items()))  # [(name, symbol), ...]
     total = len(items)
@@ -122,7 +122,7 @@ def send_all_charts(chat_id, days=180):
     requests.post(f"{TELEGRAM_API}/sendMessage",
                   json={"chat_id": chat_id, "text": f"✅ Done. Sent {sent}/{total} charts."})
 
-def send_chart_pdf(chat_id, days=180):
+def send_chart_pdf(chat_id, days=365):
     """
     Generate charts for the entire watchlist and send a single PDF.
     Runs in a background thread (caller should spawn it).
@@ -276,10 +276,10 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
     s1 = (2 * pp) - last_row["High"]
     r2 = pp + (last_row["High"] - last_row["Low"])
     s2 = pp - (last_row["High"] - last_row["Low"])
-    pe, market_cap = get_pe_and_marketcap(ticker_symbol)
+    #pe, market_cap = get_pe_and_marketcap(ticker_symbol)
 
-    pe_line = f"PE: {pe:.2f}" if pe is not None else "PE: —"
-    mc_line = f"Market Cap: {format_market_cap(market_cap)}"
+    #pe_line = f"PE: {pe:.2f}" if pe is not None else "PE: —"
+    #mc_line = f"Market Cap: {format_market_cap(market_cap)}"
 
     #print(f"\n📊 {ticker_symbol} Levels: Pivot={pp:.2f}, R1={r1:.2f}, S1={s1:.2f}, R2={r2:.2f}, S2={s2:.2f}\n")
 
@@ -394,8 +394,8 @@ def plot_stock_chart(ticker_symbol, days=365, donchian_window=20):
         f"R1: {r1:.2f} &nbsp; R2: {r2:.2f}<br>"
         f"S1: {s1:.2f} &nbsp; S2: {s2:.2f}<br>"
         f"<br><b>Valuation</b><br>"
-        f"{pe_line}<br>"
-        f"{mc_line}"
+        #f"{pe_line}<br>"
+        #f"{mc_line}"
     )
 
 
@@ -464,6 +464,173 @@ def send_chart(chat_id, symbol, days=365):
             data={"chat_id": chat_id, "text": f"Error: {e}"}
         )
     return "ok"
+
+def scan_watchlist(top_n=25):
+
+    symbols = list(WATCHLIST.values())
+
+    data = yf.download(
+        tickers=symbols,
+        period="60d",
+        group_by="ticker",
+        auto_adjust=False,
+        progress=False,
+        threads=True
+    )
+
+    results = []
+
+    for name, symbol in WATCHLIST.items():
+
+        try:
+            df = data[symbol].copy()
+
+            if len(df) < 25:
+                continue
+
+            avg20_volume = df["Volume"].rolling(20).mean().iloc[-1]
+            latest_volume = df["Volume"].iloc[-1]
+
+            if avg20_volume <= 0:
+                continue
+
+            volume_ratio = latest_volume / avg20_volume
+
+            prev_close = df["Close"].iloc[-2]
+            latest_close = df["Close"].iloc[-1]
+
+            pct_change = (
+                (latest_close - prev_close)
+                / prev_close
+            ) * 100
+
+            donchian_high = (
+                df["High"]
+                .rolling(20)
+                .max()
+                .iloc[-2]
+            )
+
+            breakout = latest_close > donchian_high
+
+            score = volume_ratio * max(abs(pct_change), 1)
+
+            if breakout:
+                score *= 2
+
+            results.append({
+                "name": name,
+                "symbol": symbol,
+                "volume_ratio": volume_ratio,
+                "pct_change": pct_change,
+                "breakout": breakout,
+                "score": score
+            })
+
+        except Exception as e:
+            print(f"Scan error {symbol}: {e}")
+
+    results.sort(
+        key=lambda x: x["score"],
+        reverse=True
+    )
+
+    return results[:top_n]
+
+def send_scan_pdf(chat_id, results, days=365):
+
+    pdf_buf = io.BytesIO()
+
+    page_size = landscape(A4)
+
+    c = canvas.Canvas(
+        pdf_buf,
+        pagesize=page_size
+    )
+
+    pw, ph = page_size
+
+    count = 0
+
+    for stock in results:
+
+        try:
+
+            fig = plot_stock_chart(
+                stock["symbol"],
+                days
+            )
+
+            img_buf = io.BytesIO()
+
+            fig.write_image(
+                img_buf,
+                format="png"
+            )
+
+            img_buf.seek(0)
+
+            margin = 24
+
+            image = ImageReader(img_buf)
+
+            iw, ih = image.getSize()
+
+            scale = min(
+                (pw - 2*margin) / iw,
+                (ph - 2*margin) / ih
+            )
+
+            draw_w = iw * scale
+            draw_h = ih * scale
+
+            x = (pw - draw_w) / 2
+            y = (ph - draw_h) / 2
+
+            c.drawImage(
+                image,
+                x,
+                y,
+                width=draw_w,
+                height=draw_h
+            )
+
+            c.showPage()
+
+            img_buf.close()
+
+            count += 1
+
+        except Exception as e:
+
+            c.drawString(
+                40,
+                ph - 50,
+                f"{stock['symbol']} : {e}"
+            )
+
+            c.showPage()
+
+    c.save()
+
+    pdf_buf.seek(0)
+
+    requests.post(
+        f"{TELEGRAM_API}/sendDocument",
+        data={
+            "chat_id": chat_id,
+            "caption": f"🔥 Top {count} Scan Results"
+        },
+        files={
+            "document": (
+                "scan_results.pdf",
+                pdf_buf,
+                "application/pdf"
+            )
+        }
+    )
+
+    pdf_buf.close()
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def telegram_webhook():
@@ -607,6 +774,74 @@ def telegram_webhook():
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": msg})
             except Exception as e:
                 requests.post(f"{TELEGRAM_API}/sendMessage", json={"chat_id": chat_id, "text": f"Error in bulk upload: {e}"})
+            return "ok"
+
+        elif text.startswith("/scan"):
+
+            try:
+                parts = text.split()
+        
+                top_n = int(parts[1]) if len(parts) > 1 else 25
+        
+            except:
+                top_n = 25
+        
+            def run_scan():
+        
+                results = scan_watchlist(top_n)
+        
+                msg = (
+                    f"🔥 Top {top_n} Stocks\n\n"
+                )
+        
+                for i, stock in enumerate(results, 1):
+        
+                    arrow = (
+                        "🟢"
+                        if stock["pct_change"] >= 0
+                        else "🔴"
+                    )
+        
+                    breakout = (
+                        " 🚀"
+                        if stock["breakout"]
+                        else ""
+                    )
+        
+                    msg += (
+                        f"{i}. {stock['name']}\n"
+                        f"Vol {stock['volume_ratio']:.1f}x "
+                        f"{arrow} {stock['pct_change']:.1f}%"
+                        f"{breakout}\n\n"
+                    )
+        
+                requests.post(
+                    f"{TELEGRAM_API}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": msg
+                    }
+                )
+        
+                send_scan_pdf(
+                    chat_id,
+                    results,
+                    180
+                )
+        
+            threading.Thread(
+                target=run_scan,
+                daemon=True
+            ).start()
+        
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": f"🔍 Scanning watchlist (Top {top_n})..."
+                }
+            )
+
             return "ok"
 
         # /mywatchlist - show plain text list (sorted)
