@@ -566,12 +566,42 @@ def scan_watchlist(top_n=25):
 
     return results[:top_n]
 
+def draw_centered(draw, text, center_x, y, font, color):
+    """
+    Draw text centered on center_x
+    """
+
+    text = str(text)
+
+    bbox = draw.textbbox(
+        (0, 0),
+        text,
+        font=font
+    )
+
+    text_width = bbox[2] - bbox[0]
+
+    draw.text(
+        (
+            center_x - text_width / 2,
+            y
+        ),
+        text,
+        fill=color,
+        font=font
+    )
+    
+
 def create_scan_image(results):
 
+    from PIL import Image, ImageDraw, ImageFont
+    import io
+
     width = 2400
-    row_h = 55
-    header_h = 180
-    height = header_h + (len(results) * row_h) + 50
+    row_h = 90
+    header_y = 140
+
+    height = header_y + 80 + (len(results) * row_h) + 40
 
     img = Image.new(
         "RGB",
@@ -582,44 +612,82 @@ def create_scan_image(results):
     draw = ImageDraw.Draw(img)
 
     try:
+
         title_font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            72
+            80
         )
 
         header_font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            34
+            40
         )
 
         font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            28
+            36
         )
 
     except:
+
         title_font = ImageFont.load_default()
         header_font = ImageFont.load_default()
         font = ImageFont.load_default()
 
-    # -----------------------------
+    def draw_centered(text, center_x, y, font, color):
+
+        bbox = draw.textbbox(
+            (0, 0),
+            str(text),
+            font=font
+        )
+
+        text_width = bbox[2] - bbox[0]
+
+        draw.text(
+            (
+                center_x - text_width / 2,
+                y
+            ),
+            str(text),
+            fill=color,
+            font=font
+        )
+
+    # -----------------------------------
     # TITLE
-    # -----------------------------
+    # -----------------------------------
+
     title = f"TOP {len(results)} BREAKOUT CANDIDATES"
 
-    draw.text(
-        (40, 25),
+    bbox = draw.textbbox(
+        (0, 0),
         title,
-        fill=(0, 255, 80),
         font=title_font
     )
 
-    # -----------------------------
-    # HEADER BAND
-    # -----------------------------
+    title_width = bbox[2] - bbox[0]
+
+    draw.text(
+        (
+            (width - title_width) / 2,
+            20
+        ),
+        title,
+        fill=(0, 255, 120),
+        font=title_font
+    )
+
+    # -----------------------------------
+    # HEADER BAR
+    # -----------------------------------
+
     draw.rectangle(
-        [(20, 120), (width - 20, 175)],
-        fill=(15, 55, 120)
+        [
+            (20, header_y),
+            (width - 20, header_y + 70)
+        ],
+        fill=(20, 65, 140)
     )
 
     headers = [
@@ -635,67 +703,79 @@ def create_scan_image(results):
     ]
 
     xs = [
-        60,
-        200,
+        100,
+        450,
         900,
-        1100,
-        1300,
-        1500,
-        1700,
-        1900,
-        2120
+        1150,
+        1350,
+        1550,
+        1750,
+        1950,
+        2200
     ]
 
     for h, x in zip(headers, xs):
-        draw.text(
-            (x, 130),
+
+        draw_centered(
             h,
-            fill=(255, 255, 255),
-            font=header_font
+            x,
+            header_y + 12,
+            header_font,
+            (255, 255, 255)
         )
 
-    # -----------------------------
-    # VERTICAL SEPARATORS
-    # -----------------------------
+    # -----------------------------------
+    # VERTICAL GRID
+    # -----------------------------------
+
     for x in xs[1:]:
+
         draw.line(
-            [(x - 40, 120), (x - 40, height - 20)],
-            fill=(60, 80, 120),
+            [
+                (x - 60, header_y),
+                (x - 60, height - 20)
+            ],
+            fill=(45, 70, 120),
             width=1
         )
 
-    y = 190
+    # -----------------------------------
+    # DATA ROWS
+    # -----------------------------------
 
-    # -----------------------------
-    # ROWS
-    # -----------------------------
+    y = header_y + 85
+
     for idx, stock in enumerate(results, start=1):
 
-        # alternating row colors
-        row_bg = (
-            (14, 24, 40)
-            if idx % 2 == 0
-            else (8, 18, 30)
-        )
+        if idx % 2:
+
+            bg = (10, 18, 30)
+
+        else:
+
+            bg = (15, 24, 40)
 
         draw.rectangle(
-            [(20, y - 5), (width - 20, y + row_h - 5)],
-            fill=row_bg
+            [
+                (20, y - 5),
+                (width - 20, y + row_h - 10)
+            ],
+            fill=bg
         )
 
         pct = stock["pct_change"]
         dist = stock["distance"]
 
         pct_color = (
-            (0, 255, 100)
+            (0, 255, 120)
             if pct >= 0
             else (255, 80, 80)
         )
 
         if dist <= 1:
-            dist_color = (0, 255, 80)
+            dist_color = (0, 255, 120)
         elif dist <= 3:
-            dist_color = (180, 255, 180)
+            dist_color = (150, 255, 150)
         else:
             dist_color = (255, 255, 255)
 
@@ -705,69 +785,94 @@ def create_scan_image(results):
             else (255, 255, 255)
         )
 
-        row = [
-            str(idx),
+        draw_centered(
+            idx,
+            xs[0],
+            y + 10,
+            font,
+            rank_color
+        )
+
+        draw_centered(
             stock["name"],
+            xs[1],
+            y + 10,
+            font,
+            (255, 255, 255)
+        )
+
+        draw_centered(
             f"{stock['volume_ratio']:.1f}x",
+            xs[2],
+            y + 10,
+            font,
+            (255, 255, 255)
+        )
+
+        draw_centered(
             f"{pct:.1f}%",
+            xs[3],
+            y + 10,
+            font,
+            pct_color
+        )
+
+        draw_centered(
             f"{stock['rsi']:.0f}",
-            "", "", "",
-            f"{dist:.1f}%"
-        ]
+            xs[4],
+            y + 10,
+            font,
+            (255, 255, 255)
+        )
 
-        for i, (value, x) in enumerate(zip(row, xs)):
+        # MA Circles
 
-            color = (255, 255, 255)
-
-            if i == 0:
-                color = rank_color
-
-            elif i == 3:
-                color = pct_color
-
-            elif i == 8:
-                color = dist_color
-
-            draw.text(
-                (x, y),
-                value,
-                fill=color,
-                font=font
-            )
-
-        # -----------------------------
-        # MA CIRCLES
-        # -----------------------------
-        ma_cols = [
+        ma_flags = [
             stock["above20"],
             stock["above50"],
             stock["above200"]
         ]
 
-        ma_xs = [1500, 1700, 1900]
+        ma_cols = [
+            xs[5],
+            xs[6],
+            xs[7]
+        ]
 
-        for flag, mx in zip(ma_cols, ma_xs):
+        radius = 18
 
-            circle_color = (
-                (50, 255, 80)
+        for flag, cx in zip(ma_flags, ma_cols):
+
+            color = (
+                (40, 255, 80)
                 if flag
-                else (255, 60, 60)
+                else (255, 70, 70)
             )
 
             draw.ellipse(
                 (
-                    mx,
-                    y + 5,
-                    mx + 24,
-                    y + 29
+                    cx - radius,
+                    y + 20,
+                    cx + radius,
+                    y + 56
                 ),
-                fill=circle_color
+                fill=color
             )
 
-        # row separator
+        draw_centered(
+            f"{dist:.1f}%",
+            xs[8],
+            y + 10,
+            font,
+            dist_color
+        )
+
         draw.line(
-            [(20, y + 45), (width - 20, y + 45)],
-            fill=(60, 80, 120),
+            [
+                (20, y + row_h - 10),
+                (width - 20, y + row_h - 10)
+            ],
+            fill=(40, 60, 100),
             width=1
         )
 
