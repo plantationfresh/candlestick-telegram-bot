@@ -689,7 +689,7 @@ def add_cover_page(c, results, pw, ph):
         )
     
         c.drawRightString(
-            cols[3] + 30,
+            cols[3] + 20,
             y,
             f"{stock['rsi']:.0f}"
         )
@@ -701,7 +701,7 @@ def add_cover_page(c, results, pw, ph):
         )
         
         c.drawCentredString(
-            cols[4],
+            cols[4] + 30,
             y,
             "✓" if stock["above20"] else "✗"
         )
@@ -713,7 +713,7 @@ def add_cover_page(c, results, pw, ph):
         )
         
         c.drawCentredString(
-            cols[5],
+            cols[5] + 30,
             y,
             "✓" if stock["above50"] else "✗"
         )
@@ -725,20 +725,21 @@ def add_cover_page(c, results, pw, ph):
         )
         
         c.drawCentredString(
-            cols[6],
+            cols[6] + 30,
             y,
             "✓" if stock["above200"] else "✗"
         )
+
+        c.setFillColor(colors.black)
     
         c.drawRightString(
-            cols[7] + 40,
+            cols[7] + 30,
             y,
             f"{stock['distance']:.1f}%"
         )
     
         y -= 18
 
-        c.setFillColor(colors.black)
         
     c.showPage()
 
