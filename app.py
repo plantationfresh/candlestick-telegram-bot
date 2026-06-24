@@ -17,6 +17,8 @@ import time
 from flask import Flask, request
 import requests
 
+from PIL import Image, ImageDraw, ImageFont
+
 class InlineKeyboardButton:
     def __init__(self, text, callback_data=None):
         self.text = text
@@ -483,12 +485,27 @@ def scan_watchlist(top_n=25):
     for name, symbol in WATCHLIST.items():
 
         try:
+
             df = data[symbol].copy()
 
             if len(df) < 25:
                 continue
 
-            avg20_volume = df["Volume"].rolling(20).mean().iloc[-1]
+            latest_close = df["Close"].iloc[-1]
+            prev_close = df["Close"].iloc[-2]
+
+            pct_change = (
+                (latest_close - prev_close)
+                / prev_close
+            ) * 100
+
+            avg20_volume = (
+                df["Volume"]
+                .rolling(20)
+                .mean()
+                .iloc[-1]
+            )
+
             latest_volume = df["Volume"].iloc[-1]
 
             if avg20_volume <= 0:
@@ -496,34 +513,42 @@ def scan_watchlist(top_n=25):
 
             volume_ratio = latest_volume / avg20_volume
 
-            prev_close = df["Close"].iloc[-2]
-            latest_close = df["Close"].iloc[-1]
-
-            pct_change = (
-                (latest_close - prev_close)
-                / prev_close
-            ) * 100
-
-            donchian_high = (
+            donchian_upper = (
                 df["High"]
                 .rolling(20)
                 .max()
-                .iloc[-2]
+                .iloc[-1]
             )
 
-            breakout = latest_close > donchian_high
+            distance_to_upper = (
+                (donchian_upper - latest_close)
+                / latest_close
+            ) * 100
 
-            score = volume_ratio * max(abs(pct_change), 1)
+            score = volume_ratio
 
-            if breakout:
-                score *= 2
+            if distance_to_upper <= 2:
+                score *= 1.5
+
+            sma20 = df["Close"].rolling(20).mean().iloc[-1]
+            sma50 = df["Close"].rolling(50).mean().iloc[-1]
+            sma200 = df["Close"].rolling(200).mean().iloc[-1]
+            
+            above20 = latest_close > sma20
+            above50 = latest_close > sma50
+            above200 = latest_close > sma200
+            
 
             results.append({
                 "name": name,
                 "symbol": symbol,
                 "volume_ratio": volume_ratio,
                 "pct_change": pct_change,
-                "breakout": breakout,
+                "distance": distance_to_upper,
+                "rsi": rsi,
+                "above20": above20,
+                "above50": above50,
+                "above200": above200,
                 "score": score
             })
 
@@ -536,6 +561,134 @@ def scan_watchlist(top_n=25):
     )
 
     return results[:top_n]
+
+def create_scan_image(results):
+
+    width = 1600
+    row_h = 45
+    height = 140 + (len(results) * row_h)
+
+    img = Image.new(
+        "RGB",
+        (width, height),
+        (15, 20, 30)
+    )
+
+    draw = ImageDraw.Draw(img)
+
+    try:
+        title_font = ImageFont.truetype(
+            "DejaVuSans-Bold.ttf",
+            34
+        )
+
+        font = ImageFont.truetype(
+            "DejaVuSans.ttf",
+            22
+        )
+
+    except:
+
+        title_font = ImageFont.load_default()
+        font = ImageFont.load_default()
+
+    draw.text(
+        (20, 20),
+        "TOP SCAN RESULTS",
+        fill=(0,255,120),
+        font=title_font
+    )
+
+    headers = [
+        "Rank",
+        "Stock",
+        "Vol x",
+        "%Chg",
+        "RSI",
+        "20MA",
+        "50MA",
+        "200MA",
+        "Dist→Upper"
+    ]
+
+    xs = [
+        20,    # Rank
+        100,   # Stock
+        450,   # Vol
+        600,   # Change
+        720,   # RSI
+        820,   # 20MA
+        920,   # 50MA
+        1030,  # 200MA
+        1170   # Dist
+    ]
+
+    y = 90
+
+    for h, x in zip(headers, xs):
+
+        draw.text(
+            (x,y),
+            h,
+            fill=(255,255,255),
+            font=font
+        )
+
+    y += row_h
+
+    for idx, stock in enumerate(results, start=1):
+
+        chg_color = (
+            (0,255,100)
+            if stock["pct_change"] >= 0
+            else (255,80,80)
+        )
+
+        dist = stock["distance"]
+
+        if dist < 0:
+            dist_text = "🚀 BO"
+        else:
+            dist_text = f"{dist:.1f}%"
+
+        row = [
+            str(idx),
+            stock["name"],
+            f"{stock['volume_ratio']:.1f}x",
+            f"{stock['pct_change']:.1f}%",
+            f"{stock['rsi']:.0f}",
+            "✅" if stock["above20"] else "❌",
+            "✅" if stock["above50"] else "❌",
+            "✅" if stock["above200"] else "❌",
+            dist_text
+        ]
+
+        for i, (value, x) in enumerate(zip(row, xs)):
+
+            color = (255,255,255)
+
+            if i == 3:
+                color = chg_color
+
+            draw.text(
+                (x,y),
+                value,
+                fill=color,
+                font=font
+            )
+
+        y += row_h
+
+    buf = io.BytesIO()
+
+    img.save(
+        buf,
+        format="PNG"
+    )
+
+    buf.seek(0)
+
+    return buf
 
 def send_scan_pdf(chat_id, results, days=365):
 
@@ -779,55 +932,72 @@ def telegram_webhook():
         elif text.startswith("/scan"):
 
             try:
+        
                 parts = text.split()
         
-                top_n = int(parts[1]) if len(parts) > 1 else 25
+                top_n = (
+                    int(parts[1])
+                    if len(parts) > 1
+                    else 25
+                )
         
             except:
+        
                 top_n = 25
         
             def run_scan():
-        
-                results = scan_watchlist(top_n)
-        
-                msg = (
-                    f"🔥 Top {top_n} Stocks\n\n"
-                )
-        
-                for i, stock in enumerate(results, 1):
-        
-                    arrow = (
-                        "🟢"
-                        if stock["pct_change"] >= 0
-                        else "🔴"
+
+                try:
+            
+                    # Scan watchlist
+                    results = scan_watchlist(top_n)
+            
+                    # Send leaderboard image first
+                    img_buf = create_scan_image(results)
+            
+                    requests.post(
+                        f"{TELEGRAM_API}/sendPhoto",
+                        data={
+                            "chat_id": chat_id,
+                            "caption": f"🔥 Top {top_n} Opportunities"
+                        },
+                        files={
+                            "photo": (
+                                "scan.png",
+                                img_buf,
+                                "image/png"
+                            )
+                        }
                     )
-        
-                    breakout = (
-                        " 🚀"
-                        if stock["breakout"]
-                        else ""
+            
+                    # Inform user PDF generation has started
+                    requests.post(
+                        f"{TELEGRAM_API}/sendMessage",
+                        json={
+                            "chat_id": chat_id,
+                            "text": f"📄 Generating chart PDF for top {len(results)} stocks..."
+                        }
                     )
-        
-                    msg += (
-                        f"{i}. {stock['name']}\n"
-                        f"Vol {stock['volume_ratio']:.1f}x "
-                        f"{arrow} {stock['pct_change']:.1f}%"
-                        f"{breakout}\n\n"
+            
+                    # Generate and send PDF
+                    send_scan_pdf(
+                        chat_id,
+                        results,
+                        days=180
                     )
-        
-                requests.post(
-                    f"{TELEGRAM_API}/sendMessage",
-                    json={
-                        "chat_id": chat_id,
-                        "text": msg
-                    }
-                )
-        
-                send_scan_pdf(
-                    chat_id,
-                    results,
-                    365
-                )
+            
+                except Exception as e:
+            
+                    requests.post(
+                        f"{TELEGRAM_API}/sendMessage",
+                        json={
+                            "chat_id": chat_id,
+                            "text": f"❌ Scan failed:\n{e}"
+                        }
+                    )
+
+
+
         
             threading.Thread(
                 target=run_scan,
@@ -838,13 +1008,14 @@ def telegram_webhook():
                 f"{TELEGRAM_API}/sendMessage",
                 json={
                     "chat_id": chat_id,
-                    "text": f"🔍 Scanning watchlist (Top {top_n})..."
+                    "text": f"🔍 Scanning Top {top_n}..."
                 }
             )
-
+        
             return "ok"
 
         # /mywatchlist - show plain text list (sorted)
+        
         elif text.startswith("/mywatchlist"):
             try:
                 items = [f"{name} -> {symbol}" for name, symbol in sorted(WATCHLIST.items())]
