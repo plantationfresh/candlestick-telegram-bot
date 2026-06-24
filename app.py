@@ -639,14 +639,16 @@ def add_cover_page(c, results, pw, ph):
         540,    # 200ma
         630     # dist
     ]
-
+    
+    c.setFillColor(colors.lightblue)
+    
     c.rect(
         40,
         y - 5,
-        500,
+        650,
         22,
         fill=1,
-        stroke=0
+        stroke=1
     )
 
     for txt, x in zip(headers, cols):
