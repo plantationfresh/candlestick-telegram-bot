@@ -826,7 +826,7 @@ def telegram_webhook():
                 send_scan_pdf(
                     chat_id,
                     results,
-                    180
+                    365
                 )
         
             threading.Thread(
