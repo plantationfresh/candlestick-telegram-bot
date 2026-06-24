@@ -1051,40 +1051,64 @@ def telegram_webhook():
                 try:
             
                     # Scan watchlist
+            
                     results = scan_watchlist(top_n)
             
-                    # Send leaderboard image first
-                    img_buf = create_scan_image(results)
+                    if not results:
             
-                    requests.post(
-                        f"{TELEGRAM_API}/sendDocument",
-                        data={
-                            "chat_id": chat_id,
-                            "caption": f"🔥 Top {top_n} Opportunities"
-                        },
-                        files={
-                            "document": (
-                                "scan.png",
-                                img_buf,
-                                "image/png"
+                        requests.post(
+                            f"{TELEGRAM_API}/sendMessage",
+                            json={
+                                "chat_id": chat_id,
+                                "text": "❌ No candidates found."
+                            }
+                        )
+            
+                        return
+            
+                    # Quick summary
+            
+                    closest = sorted(
+                        results,
+                        key=lambda x: x["distance"]
+                    )[:5]
+            
+                    summary = "\n".join(
+                        [
+                            f"{i}. {s['name']} ({s['distance']:.1f}%)"
+                            for i, s in enumerate(
+                                closest,
+                                start=1
                             )
-                        }
+                        ]
                     )
             
-                    # Inform user PDF generation has started
                     requests.post(
                         f"{TELEGRAM_API}/sendMessage",
                         json={
                             "chat_id": chat_id,
-                            "text": f"📄 Generating chart PDF for top {len(results)} stocks..."
+                            "text":
+                                f"🚀 Breakout Scan Complete\n\n"
+                                f"Candidates Found: {len(results)}\n\n"
+                                f"Closest To Breakout:\n\n"
+                                f"{summary}\n\n"
+                                f"📄 Generating PDF..."
                         }
                     )
             
-                    # Generate and send PDF
+                    # Generate PDF
                     send_scan_pdf(
                         chat_id,
                         results,
                         days=180
+                    )
+            
+                    requests.post(
+                        f"{TELEGRAM_API}/sendMessage",
+                        json={
+                            "chat_id": chat_id,
+                            "text": "✅ PDF sent successfully."
+                        }
                     )
             
                 except Exception as e:
@@ -1098,8 +1122,6 @@ def telegram_webhook():
                     )
 
 
-
-        
             threading.Thread(
                 target=run_scan,
                 daemon=True
@@ -1109,11 +1131,13 @@ def telegram_webhook():
                 f"{TELEGRAM_API}/sendMessage",
                 json={
                     "chat_id": chat_id,
-                    "text": f"🔍 Scanning Top {top_n}..."
+                    "text":
+                        f"🔍 Scanning watchlist...\n"
+                        f"Top {top_n} candidates requested."
                 }
             )
-        
-            return "ok"
+    
+        return "ok"
 
         # /mywatchlist - show plain text list (sorted)
         
