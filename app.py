@@ -534,6 +534,29 @@ def scan_watchlist(top_n=25):
                 / latest_close
             ) * 100
 
+            donchian_lower = (
+                df["Low"]
+                .rolling(20)
+                .min()
+                .iloc[-1]
+            )
+            
+            channel_width = (
+                donchian_upper
+                - donchian_lower
+            )
+            
+            if channel_width > 0:
+            
+                position = (
+                    (latest_close - donchian_lower)
+                    / channel_width
+                )
+            
+            else:
+            
+                position = 0.5
+
             score = volume_ratio
 
             if distance_to_upper <= 2:
@@ -558,7 +581,8 @@ def scan_watchlist(top_n=25):
                 "above20": above20,
                 "above50": above50,
                 "above200": above200,
-                "score": score
+                "score": score,
+                "position": position
             })
 
         except Exception as e:
@@ -621,6 +645,8 @@ def add_cover_page(c, results, pw, ph):
     headers = [
         "#",
         "STOCK",
+        "VOL",
+        "POS",
         "%CHG",
         "RSI",
         "20MA",
@@ -635,12 +661,14 @@ def add_cover_page(c, results, pw, ph):
     cols = [
         40,     # rank
         80,     # stock
-        250,    # %chg
-        330,    # rsi
-        400,    # 20ma
-        470,    # 50ma
-        540,    # 200ma
-        630     # dist
+        250,    # vol
+        330,    # pos
+        410,    # %chg
+        500,    # rsi
+        570,    # 20ma
+        640,    # 50ma
+        710,    # 200ma
+        790     # dist
     ]
     
     #c.setFillColor(colors.lightblue)
@@ -696,15 +724,50 @@ def add_cover_page(c, results, pw, ph):
             y,
             stock["name"]
         )
+
+        if stock["volume_ratio"] >= 3:
+            c.setFillColor(colors.green)
+        elif stock["volume_ratio"] >= 2:
+            c.setFillColor(colors.orange)
+        else:
+            c.setFillColor(colors.black)
+        
+        c.drawRightString(
+            cols[2] + 40,
+            y,
+            f"{stock['volume_ratio']:.1f}x"
+        )
+        
+        c.setFillColor(colors.black)
+
+        if stock["position"] <= 0.20:
+
+            c.setFillColor(colors.green)
+        
+        elif stock["position"] <= 0.40:
+        
+            c.setFillColor(colors.orange)
+        
+        else:
+        
+            c.setFillColor(colors.red)
+        
+        c.drawRightString(
+            cols[3] + 40,
+            y,
+            f"{stock['position']*100:.0f}%"
+        )
+        
+        c.setFillColor(colors.black)
     
         c.drawRightString(
-            cols[2] + 50,
+            cols[3] + 50,
             y,
             f"{stock['pct_change']:.1f}%"
         )
     
         c.drawRightString(
-            cols[3] + 20,
+            cols[4] + 20,
             y,
             f"{stock['rsi']:.0f}"
         )
@@ -716,7 +779,7 @@ def add_cover_page(c, results, pw, ph):
         )
         
         c.drawCentredString(
-            cols[4] + 30,
+            cols[5] + 30,
             y,
             "✓" if stock["above20"] else "✗"
         )
@@ -728,7 +791,7 @@ def add_cover_page(c, results, pw, ph):
         )
         
         c.drawCentredString(
-            cols[5] + 30,
+            cols[6] + 30,
             y,
             "✓" if stock["above50"] else "✗"
         )
@@ -740,7 +803,7 @@ def add_cover_page(c, results, pw, ph):
         )
         
         c.drawCentredString(
-            cols[6] + 30,
+            cols[7] + 30,
             y,
             "✓" if stock["above200"] else "✗"
         )
@@ -748,7 +811,7 @@ def add_cover_page(c, results, pw, ph):
         c.setFillColor(colors.black)
     
         c.drawRightString(
-            cols[7] + 30,
+            cols[8] + 30,
             y,
             f"{stock['distance']:.1f}%"
         )
@@ -781,9 +844,15 @@ def send_scan_pdf(chat_id, results, days=365):
 
     count = 0
 
-    for stock in sorted(
+    sorted_results = sorted(
         results,
-        key=lambda x: x["distance"]
+        key=lambda x: x["volume_ratio"],
+        reverse=True
+    )
+
+    for idx, stock in enumerate(
+        sorted_results,
+        start=1
     ):
 
         try:
