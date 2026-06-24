@@ -19,6 +19,10 @@ import requests
 
 from PIL import Image, ImageDraw, ImageFont
 
+from pathlib import Path
+
+FONT_DIR = Path("fonts")
+
 class InlineKeyboardButton:
     def __init__(self, text, callback_data=None):
         self.text = text
@@ -692,32 +696,37 @@ def create_scan_image(results):
     try:
 
         title_font = ImageFont.truetype(
-            "DejaVuSans-Bold.ttf",
-            72
+            "fonts/JetBrainsMono-ExtraBoldItalic.ttf",
+            90
         )
-
+        
         subtitle_font = ImageFont.truetype(
-            "DejaVuSans.ttf",
+            "fonts/JetBrainsMono-BoldItalic.ttf",
+            36
+        )
+        
+        header_font = ImageFont.truetype(
+            "fonts/JetBrainsMonoNL-Bold.ttf",
             32
         )
-
-        header_font = ImageFont.truetype(
-            "DejaVuSans-Bold.ttf",
-            30
-        )
-
+        
         stock_font = ImageFont.truetype(
-            "DejaVuSans-Bold.ttf",
-            42
+            "fonts/JetBrainsMonoNL-SemiBold.ttf",
+            44
+        )
+        
+        value_font = ImageFont.truetype(
+            "fonts/JetBrainsMono-Bold.ttf",
+            34
         )
 
         font = ImageFont.truetype(
-            "DejaVuSans.ttf",
+            "JetBrainsMonoNL-SemiBold.ttf",
             30
         )
 
         badge_font = ImageFont.truetype(
-            "DejaVuSans-Bold.ttf",
+            "JetBrainsMonoNL-SemiBold.ttf",
             26
         )
 
