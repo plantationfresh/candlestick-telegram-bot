@@ -18,6 +18,7 @@ from flask import Flask, request
 import requests
 
 from PIL import Image, ImageDraw, ImageFont
+from reportlab.lib import colors
 
 from pathlib import Path
 
@@ -597,449 +598,187 @@ def draw_centered(draw, text, center_x, y, font, color):
     )
 
 
-def create_scan_image(results):
+def add_cover_page(c, results, pw, ph):
 
-    from PIL import Image, ImageDraw, ImageFont
-    import io
 
-    # ==========================================
-    # HELPERS
-    # ==========================================
+    # Title
 
-    def draw_centered(draw, text, center_x, y, font, color):
+    c.setFont("Helvetica-Bold", 28)
 
-        text = str(text)
-
-        bbox = draw.textbbox(
-            (0, 0),
-            text,
-            font=font
-        )
-
-        text_width = bbox[2] - bbox[0]
-
-        draw.text(
-            (
-                center_x - text_width / 2,
-                y
-            ),
-            text,
-            fill=color,
-            font=font
-        )
-
-    def rounded_rect(draw, xy, fill, radius=16):
-
-        draw.rounded_rectangle(
-            xy,
-            radius=radius,
-            fill=fill
-        )
-
-    # ==========================================
-    # COLORS
-    # ==========================================
-
-    BG = (242, 245, 250)
-
-    CARD = (255, 255, 255)
-
-    HEADER = (59, 130, 246)
-
-    TEXT = (31, 41, 55)
-
-    MUTED = (107, 114, 128)
-
-    GRID = (225, 230, 235)
-
-    GREEN = (34, 197, 94)
-
-    RED = (239, 68, 68)
-
-    AMBER = (245, 158, 11)
-
-    GREEN_BG = (220, 252, 231)
-
-    RED_BG = (254, 226, 226)
-
-    # ==========================================
-    # LAYOUT
-    # ==========================================
-
-    width = 2200
-
-    row_h = 95
-
-    title_h = 120
-
-    header_y = title_h
-
-    height = (
-        header_y +
-        80 +
-        (len(results) * row_h) +
-        40
+    c.drawCentredString(
+        pw / 2,
+        ph - 50,
+        "BREAKOUT WATCHLIST"
     )
 
-    img = Image.new(
-        "RGB",
-        (width, height),
-        BG
+    c.setFont("Helvetica", 12)
+
+    c.drawCentredString(
+        pw / 2,
+        ph - 75,
+        f"{len(results)} candidates found"
     )
 
-    draw = ImageDraw.Draw(img)
+    # Summary stats
 
-    # ==========================================
-    # FONTS
-    # ==========================================
+    avg_rsi = sum(
+        r["rsi"] for r in results
+    ) / len(results)
 
-    try:
-
-        title_font = ImageFont.truetype(
-            "fonts/JetBrainsMono-ExtraBoldItalic.ttf",
-            5000
-        )
-        
-        subtitle_font = ImageFont.truetype(
-            "fonts/JetBrainsMono-ExtraBold.ttf",
-            1000
-        )
-        
-        header_font = ImageFont.truetype(
-            "fonts/JetBrainsMono-ExtraBold.ttf",
-            3500
-        )
-        
-        stock_font = ImageFont.truetype(
-            "fonts/JetBrainsMono-ExtraBold.ttf",
-            4000
-        )
-        
-        value_font = ImageFont.truetype(
-            "fonts/JetBrainsMono-ExtraBold.ttf",
-            4000
-        )
-
-        font = ImageFont.truetype(
-            "JetBrainsMono-ExtraBold.ttf",
-            4000
-        )
-
-        badge_font = ImageFont.truetype(
-            "JetBrainsMono-ExtraBold.ttf",
-            4000
-        )
-
-    except:
-
-        title_font = ImageFont.load_default()
-        subtitle_font = ImageFont.load_default()
-        header_font = ImageFont.load_default()
-        stock_font = ImageFont.load_default()
-        font = ImageFont.load_default()
-        badge_font = ImageFont.load_default()
-
-    # ==========================================
-    # TITLE
-    # ==========================================
-
-    draw_centered(
-        draw,
-        "🚀 BREAKOUT WATCHLIST",
-        width // 2,
-        15,
-        title_font,
-        TEXT
+    above20 = sum(
+        r["above20"] for r in results
     )
 
-    draw_centered(
-        draw,
-        f"{len(results)} Stocks Near Resistance Breakout",
-        width // 2,
-        85,
-        subtitle_font,
-        MUTED
+    above50 = sum(
+        r["above50"] for r in results
     )
 
-    # ==========================================
-    # MAIN CARD
-    # ==========================================
-
-    rounded_rect(
-        draw,
-        (
-            20,
-            header_y,
-            width - 20,
-            height - 20
-        ),
-        CARD,
-        radius=24
+    above200 = sum(
+        r["above200"] for r in results
     )
 
-    # ==========================================
-    # HEADER
-    # ==========================================
+    y = ph - 130
 
-    rounded_rect(
-        draw,
-        (
-            30,
-            header_y + 15,
-            width - 30,
-            header_y + 75
-        ),
-        HEADER,
-        radius=16
+    c.setFont("Helvetica-Bold", 14)
+
+    c.drawString(
+        50,
+        y,
+        "Market Summary"
     )
+
+    c.setFont("Helvetica", 12)
+
+    y -= 30
+
+    c.drawString(
+        60,
+        y,
+        f"Average RSI: {avg_rsi:.1f}"
+    )
+
+    y -= 20
+
+    c.drawString(
+        60,
+        y,
+        f"Above 20 MA: {above20}"
+    )
+
+    y -= 20
+
+    c.drawString(
+        60,
+        y,
+        f"Above 50 MA: {above50}"
+    )
+
+    y -= 20
+
+    c.drawString(
+        60,
+        y,
+        f"Above 200 MA: {above200}"
+    )
+
+    # Top 10 table
+
+    y -= 60
+
+    c.setFont("Helvetica-Bold", 14)
+
+    c.drawString(
+        50,
+        y,
+        "Top 10 Closest To Breakout"
+    )
+
+    y -= 30
+
+    closest = sorted(
+        results,
+        key=lambda x: x["distance"]
+    )[:10]
 
     headers = [
-        "RANK",
-        "STOCK",
-        "VOL",
-        "%CHG",
+        "#",
+        "Stock",
         "RSI",
-        "20",
-        "50",
-        "200",
-        "DIST"
+        "Vol",
+        "Dist"
     ]
 
-    xs = [
-        90,
-        430,
-        760,
-        980,
-        1180,
-        1420,
-        1620,
-        1820,
-        2040
+    cols = [
+        50,
+        100,
+        280,
+        350,
+        450
     ]
 
-    for h, x in zip(headers, xs):
+    c.setFillColor(colors.lightblue)
 
-        draw_centered(
-            draw,
-            h,
-            x,
-            header_y + 28,
-            header_font,
-            (255, 255, 255)
-        )
-
-    # ==========================================
-    # ROWS
-    # ==========================================
-
-    start_y = header_y + 95
-
-    for idx, stock in enumerate(results, start=1):
-
-        y = start_y + ((idx - 1) * row_h)
-
-        if idx % 2 == 0:
-
-            row_color = (250, 251, 253)
-
-            rounded_rect(
-                draw,
-                (
-                    35,
-                    y,
-                    width - 35,
-                    y + row_h - 8
-                ),
-                row_color,
-                radius=12
-            )
-
-        pct = stock["pct_change"]
-
-        rsi = stock["rsi"]
-
-        dist = stock["distance"]
-
-        # -------------------------
-        # Rank
-        # -------------------------
-
-        rank_color = TEXT
-
-        if idx == 1:
-            rank_color = (245, 158, 11)
-        elif idx == 2:
-            rank_color = (120, 120, 120)
-        elif idx == 3:
-            rank_color = (180, 83, 9)
-
-        draw_centered(
-            draw,
-            idx,
-            xs[0],
-            y + 24,
-            stock_font,
-            rank_color
-        )
-
-        # -------------------------
-        # Stock
-        # -------------------------
-
-        draw_centered(
-            draw,
-            stock["name"],
-            xs[1],
-            y + 24,
-            stock_font,
-            TEXT
-        )
-
-        # -------------------------
-        # Volume
-        # -------------------------
-
-        draw_centered(
-            draw,
-            f"{stock['volume_ratio']:.1f}x",
-            xs[2],
-            y + 28,
-            font,
-            TEXT
-        )
-
-        # -------------------------
-        # Percent Change Badge
-        # -------------------------
-
-        positive = pct >= 0
-
-        rounded_rect(
-            draw,
-            (
-                xs[3] - 55,
-                y + 12,
-                xs[3] + 55,
-                y + 58
-            ),
-            GREEN_BG if positive else RED_BG,
-            radius=12
-        )
-
-        draw_centered(
-            draw,
-            f"{pct:.1f}%",
-            xs[3],
-            y + 20,
-            badge_font,
-            GREEN if positive else RED
-        )
-
-        # -------------------------
-        # RSI
-        # -------------------------
-
-        rsi_color = TEXT
-
-        if rsi >= 70:
-            rsi_color = RED
-        elif rsi >= 60:
-            rsi_color = AMBER
-
-        draw_centered(
-            draw,
-            int(rsi),
-            xs[4],
-            y + 28,
-            font,
-            rsi_color
-        )
-
-        # -------------------------
-        # MA Circles
-        # -------------------------
-
-        ma_flags = [
-            stock["above20"],
-            stock["above50"],
-            stock["above200"]
-        ]
-
-        ma_cols = [
-            xs[5],
-            xs[6],
-            xs[7]
-        ]
-
-        radius = 15
-
-        for flag, cx in zip(ma_flags, ma_cols):
-
-            color = GREEN if flag else RED
-
-            draw.ellipse(
-                (
-                    cx - radius,
-                    y + 22,
-                    cx + radius,
-                    y + 52
-                ),
-                fill=color
-            )
-
-        # -------------------------
-        # Distance
-        # -------------------------
-
-        if dist <= 3:
-
-            dist_color = GREEN
-
-        elif dist <= 6:
-
-            dist_color = AMBER
-
-        else:
-
-            dist_color = TEXT
-
-        draw_centered(
-            draw,
-            f"{dist:.1f}%",
-            xs[8],
-            y + 28,
-            stock_font,
-            dist_color
-        )
-
-        # separator
-
-        draw.line(
-            (
-                50,
-                y + row_h - 2,
-                width - 50,
-                y + row_h - 2
-            ),
-            fill=GRID,
-            width=1
-        )
-
-    # ==========================================
-    # EXPORT
-    # ==========================================
-
-    buf = io.BytesIO()
-
-    img.save(
-        buf,
-        format="PNG",
-        optimize=True
+    c.rect(
+        40,
+        y - 5,
+        500,
+        22,
+        fill=1,
+        stroke=0
     )
 
-    buf.seek(0)
+    c.setFillColor(colors.black)
 
-    return buf
+    for txt, x in zip(headers, cols):
+
+        c.drawString(
+            x,
+            y,
+            txt
+        )
+
+    y -= 25
+
+    c.setFont("Helvetica", 11)
+
+    for idx, stock in enumerate(
+        closest,
+        start=1
+    ):
+
+        c.drawString(
+            cols[0],
+            y,
+            str(idx)
+        )
+
+        c.drawString(
+            cols[1],
+            y,
+            stock["name"]
+        )
+
+        c.drawString(
+            cols[2],
+            y,
+            f"{stock['rsi']:.0f}"
+        )
+
+        c.drawString(
+            cols[3],
+            y,
+            f"{stock['volume_ratio']:.1f}x"
+        )
+
+        c.drawString(
+            cols[4],
+            y,
+            f"{stock['distance']:.1f}%"
+        )
+
+        y -= 20
+
+    c.showPage()
 
 
 def send_scan_pdf(chat_id, results, days=365):
@@ -1055,9 +794,19 @@ def send_scan_pdf(chat_id, results, days=365):
 
     pw, ph = page_size
 
+    add_cover_page(
+        c,
+        results,
+        pw,
+        ph
+    )
+
     count = 0
 
-    for stock in results:
+    for stock in sorted(
+        results,
+        key=lambda x: x["distance"]
+    ):
 
         try:
 
