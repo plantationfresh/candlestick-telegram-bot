@@ -979,7 +979,7 @@ def telegram_webhook():
             )
             return "ok"
 
-        elif text.split()[0] == "/chartpdf":
+        elif text.startswith("/chartpdf"):
             try:
                 parts = text.split()
                 days = int(parts[1]) if len(parts) > 1 else 180
