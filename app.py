@@ -48,7 +48,6 @@ def load_watchlist():
     "RELIANCE": "RELIANCE.NS",
     "M&M": "M&M.NS",
     "ARE&M": "ARE&M.NS",
-    "SMLISUZU": "SMLISUZU.NS",
     "ASHOKLEY": "ASHOKLEY.NS",
     "EICHER":"EICHERMOT.NS"
     }
@@ -569,9 +568,9 @@ def scan_watchlist(top_n=25):
 
 def create_scan_image(results):
 
-    width = 1200
-    row_h = 45
-    height = 140 + (len(results) * row_h)
+    width = 2200
+    row_h = 55
+    height = 180 + (len(results) * row_h)
 
     img = Image.new(
         "RGB",
@@ -584,17 +583,17 @@ def create_scan_image(results):
     try:
         title_font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            48
+            64
         )
         
         header_font = ImageFont.truetype(
             "DejaVuSans-Bold.ttf",
-            28
+            34
         )
         
         font = ImageFont.truetype(
-            "DejaVuSans.ttf",
-            26
+            "DejaVuSans-Bold.ttf",
+            30
         )
 
     except:
@@ -603,9 +602,11 @@ def create_scan_image(results):
         header_font = ImageFont.load_default()
         font = ImageFont.load_default()
         
+    title = f"TOP {len(results)} BREAKOUT CANDIDATES"
+
     draw.text(
-        (20, 20),
-        "TOP SCAN RESULTS",
+        (40, 25),
+        title,
         fill=(0,255,120),
         font=title_font
     )
@@ -623,15 +624,15 @@ def create_scan_image(results):
     ]
 
     xs = [
-        20,    # Rank
-        80,    # Stock
-        380,   # Vol
-        500,   # Chg
-        610,   # RSI
-        700,   # 20MA
-        790,   # 50MA
-        880,   # 200MA
-        1000   # Dist
+        40,     # Rank
+        160,    # Stock
+        800,    # Vol
+        980,    # Chg
+        1150,   # RSI
+        1300,   # 20MA
+        1450,   # 50MA
+        1600,   # 200MA
+        1800    # Dist
     ]
 
     y = 90
@@ -711,7 +712,7 @@ def create_scan_image(results):
 
         draw.line(
             [(20, y + 35), (width - 20, y + 35)],
-            fill=(40, 50, 70),
+            fill=(70, 80, 100),
             width=1
         )
         
@@ -721,9 +722,10 @@ def create_scan_image(results):
 
     img.save(
         buf,
-        format="PNG"
+        format="PNG",
+        optimize=True
     )
-
+    
     buf.seek(0)
 
     return buf
@@ -994,13 +996,13 @@ def telegram_webhook():
                     img_buf = create_scan_image(results)
             
                     requests.post(
-                        f"{TELEGRAM_API}/sendPhoto",
+                        f"{TELEGRAM_API}/sendDocument",
                         data={
                             "chat_id": chat_id,
                             "caption": f"🔥 Top {top_n} Opportunities"
                         },
                         files={
-                            "photo": (
+                            "document": (
                                 "scan.png",
                                 img_buf,
                                 "image/png"
