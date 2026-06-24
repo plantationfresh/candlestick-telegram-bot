@@ -493,11 +493,16 @@ def scan_watchlist(top_n=25):
 
             latest_close = df["Close"].iloc[-1]
             prev_close = df["Close"].iloc[-2]
-
+            
             pct_change = (
                 (latest_close - prev_close)
                 / prev_close
             ) * 100
+            
+            rsi = calculate_rsi(df["Close"]).iloc[-1]
+            
+            if pd.isna(rsi):
+                rsi = 0
 
             avg20_volume = (
                 df["Volume"]
